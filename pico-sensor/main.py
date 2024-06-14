@@ -810,7 +810,8 @@ Content-Type: text/html
     </head>
     <body style="background-color: rgb(240, 240, 240);">
         <h1>{given_name}</h1>
-        <p>{uuid}</p>
+        <p>Laiska-Jaakko Plant Monitor</p>
+        <p>device-uuid: {uuid}</p>
         <h3>Wi-Fi Setup</h3>
         <form action="/setup_wifi" method="post">
             <label for="ssid">SSID:</label><br>
