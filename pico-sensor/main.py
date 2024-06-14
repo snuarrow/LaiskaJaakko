@@ -66,9 +66,9 @@ class CloudUpdater:
         self.remote_version = self.remote_version_config["version"]
         print(f"Current version: {self.current_version}")
         print(f"Remote version: {self.remote_version}")
-        updates_available = self.remote_version > self.current_version
-        print(f"Updates available: {updates_available}")
-        return updates_available
+        self.updates_available = self.remote_version > self.current_version
+        print(f"Updates available: {self.updates_available}")
+        return self.updates_available
     
     def pretty_current_version(self):
         return f"v.{self.current_version}"

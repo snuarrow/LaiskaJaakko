@@ -63,12 +63,12 @@ function check_updates_available() {
                 updates_available = response.updates_available;
                 if (updates_available) {
                     document.getElementById('updates_available').innerHTML = "Updates available";
-                    document.getElementById('update_button').innerHTML = "Update";
                     document.getElementById('update_button').onclick = update_software;
+                    document.getElementById('update_button').innerHTML = "Update";
                 } else {
                     document.getElementById('updates_available').innerHTML = "No updates available";
-                    document.getElementById('update_button').innerHTML = "Check for available updates";}
                     document.getElementById('update_button').onclick = check_updates_available;
+                    document.getElementById('update_button').innerHTML = "Check for available updates";}
             } catch (e) {
                 console.log("Error parsing JSON response", e);
             }
