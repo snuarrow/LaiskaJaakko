@@ -809,9 +809,8 @@ Content-Type: text/html
         <script src=main.js></script>
     </head>
     <body style="background-color: rgb(240, 240, 240);">
-        <h1>Plant Monitor</h1>
+        <h1>{given_name}</h1>
         <p>{uuid}</p>
-        <p>{given_name}</p>
         <h3>Wi-Fi Setup</h3>
         <form action="/setup_wifi" method="post">
             <label for="ssid">SSID:</label><br>
