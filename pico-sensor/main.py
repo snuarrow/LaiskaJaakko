@@ -23,13 +23,11 @@ import utime
 from time import sleep
 from os import remove
 import os
+import ssl
 import json
 from machine import Pin, ADC, Timer, I2C, freq, reset
 from gc import collect, mem_alloc, mem_free
 import urandom
-
-
-version = "v0.1.1"
 
 # periodic_restart_timer = Timer()
 # periodic_restart_timer.init(period=60*60*1000, mode=Timer.PERIODIC, callback=periodic_restart)
@@ -45,6 +43,90 @@ WIFI_CONFIG_FILE = "wifi_config.json"
 CONFIG_FILE = "config.json"
 led = Pin("LED", Pin.OUT)
 led.value(1)
+
+
+
+
+class CloudUpdater:
+
+    branch: str = "main"
+    base_url: str = f"https://raw.githubusercontent.com/snuarrow/LaiskaJaakko/{branch}/pico-sensor/"
+    current_version: int = 0
+    updates_available: bool = False
+
+    def __init__(self):
+        self.updates_available = self.check_for_updates()
+
+    def check_for_updates(self):
+        self.version_config = self._load_file("version.json")
+        print("version config loaded")
+        self.current_version = self.version_config["version"]
+        self._download_file("version.json", "remote-version.json")
+        self.remote_version_config = self._load_file("remote-version.json")
+        self.remote_version = self.remote_version_config["version"]
+        print(f"Current version: {self.current_version}")
+        print(f"Remote version: {self.remote_version}")
+        updates_available = self.remote_version > self.current_version
+        print(f"Updates available: {updates_available}")
+        return updates_available
+    
+    def pretty_current_version(self):
+        return f"v.{self.current_version}"
+
+    def update(self, timer=None):
+        print("updating..")
+        self.version_config = self._load_file("version.json")
+        for file in self.version_config["files_included"]:
+            print(f"downloading {file}")
+            self._download_file(file, file)
+        self._install_update()
+
+    def _download_file(self, remote_file_name, local_file_name):
+        https_file_url = f"{self.base_url}{remote_file_name}"
+        print(f"Downloading file.. {https_file_url}")
+        _, _, host, path = https_file_url.split('/', 3)
+        path = '/' + path
+
+        addr = socket.getaddrinfo(host, 443)[0][-1]
+        s = socket.socket()
+        s.connect(addr)
+
+        # Wrap the socket to add SSL/TLS
+        s = ssl.wrap_socket(s, server_hostname=host)
+
+        # Send HTTP GET request
+        request = 'GET {} HTTP/1.1\r\nHost: {}\r\nConnection: close\r\n\r\n'.format(path, host)
+        s.write(request.encode('utf-8'))
+
+        # Read response headers and body
+        response = b""
+        while b"\r\n\r\n" not in response:
+            response += s.read(1)
+        headers, body = response.split(b'\r\n\r\n', 1)
+
+        # Write the initial part of the body to the file
+        with open(local_file_name, 'wb') as file:
+            file.write(body)
+
+            # Continue to read the rest of the file
+            while True:
+                data = s.read(1024)
+                if not data:
+                    break
+                file.write(data)
+
+        s.close()
+        print(f"File downloaded to {local_file_name}")
+
+    def _install_update(self):
+        print("installing update..")
+        sleep(1)
+        reset()
+
+    def _load_file(self, filename):
+        with open(filename, "r") as f:
+            version_config = json.load(f)
+            return version_config
 
 
 class SensorMonitor:  # Has MoistureSensor and SensorHistory, periodicaly reads data from MoistureSensor and stores it in SensorHistory
@@ -98,6 +180,9 @@ class CustomTimer:
             self.start_time = time.ticks_ms()
             self.unix_time = new_unix_time
             print("NTP Time Updated:", new_unix_time)
+            if new_unix_time < 0:
+                print("NTP time is negative, defaulting to Jan 1 2000")  # TODO: this is a temporary fix, find out why NTP time is occasionally negative
+                self.unix_time = 946684800
         except Exception as e:
             print("Failed to update NTP time:", e)
 
@@ -521,10 +606,30 @@ def handle_request(conn):
     global storage_sensor
     global version
     global pico_timer
+    global cloud_updater
     request = conn.recv(1024)
     request = str(request)
     ssid = None
     password = None
+
+    if "GET /updates_available" in request:
+        conn.send("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n")
+        updates_available = cloud_updater.check_for_updates()
+        conn.send(json.dumps({"updates_available": updates_available}))
+        conn.close()
+        return
+
+    if "POST /update_software" in request:
+        if not cloud_updater.updates_available:
+            conn.send("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n")
+            conn.send(json.dumps({"status": "no updates available"}))
+            conn.close()
+            return
+        conn.send("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n")
+        conn.send(json.dumps({"status": "updating"}))
+        conn.close()
+        cloud_updater.update()
+        return
 
     if "GET /chart.js" in request:
         stream_file("chart.js", conn, "application/javascript")
@@ -579,6 +684,11 @@ Content-Type: text/plain
         conn.send(response)
         conn.close()
         return response
+
+    if "GET /main.js" in request:
+        stream_file("main.js", conn, "application/javascript")
+        conn.close()
+        return
 
     if "GET /moisture_data" in request:
         labels = list(range(60))
@@ -691,18 +801,15 @@ Content-Type: text/html
 <!DOCTYPE html>
 <html>
     <head>
-        <title>{version} Plant Monitor</title>
+        <title>{cloud_updater.pretty_current_version()} Plant Monitor</title>
         <style>
             {styles}
         </style>
         <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-        <script>
-                {serve_file("main.js")}
-        </script>
+        <script src=main.js></script>
     </head>
     <body style="background-color: rgb(240, 240, 240);">
-        <h1>Sensor</h1>
-        <p>{version}</p>
+        <h1>Plant Monitor</h1>
         <p>{uuid}</p>
         <p>{given_name}</p>
         <h3>Wi-Fi Setup</h3>
@@ -719,6 +826,9 @@ Content-Type: text/html
             <span class="slider round"></span>
         </label>
         <h3>System</h3>
+        <p>{cloud_updater.pretty_current_version()}</p>
+        <p id=updates_available>{"Updates available" if cloud_updater.updates_available else "No updates available"}</p>
+        {'<button id=update_button onclick="update_software()">Update</button>' if cloud_updater.updates_available else '<button id=update_button onclick="check_updates_available()">Check for available updates</button>'}
         <p>used storage: {storage_sensor.used_kilobytes()} / {storage_sensor.total_kilobytes()} KB</p>
         <form action="/memory" method="post">
             <button onclick="print_memory_usage()">Print memory usage</button>
@@ -820,6 +930,9 @@ if ssid and password:
     connect_to_wifi(ssid, password)
 else:
     start_ap()
+
+print("connecting to cloud..")
+cloud_updater = CloudUpdater()
 
 print("starting sensors..")
 pico_timer = CustomTimer()
