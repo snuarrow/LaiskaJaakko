@@ -22,12 +22,11 @@ import time
 import utime
 from time import sleep
 from os import remove
-import os
 import ssl
 import json
 from machine import Pin, ADC, Timer, I2C, freq, reset
 from gc import collect, mem_alloc, mem_free
-import urandom
+import uos
 
 # periodic_restart_timer = Timer()
 # periodic_restart_timer.init(period=60*60*1000, mode=Timer.PERIODIC, callback=periodic_restart)
@@ -36,13 +35,14 @@ import urandom
 frequency_MHz = 64
 freq(frequency_MHz * 1000000)
 print("Current frequency: ", freq() / 1000000, "MHz")
-
+AHT10_I2C_ADDRESS = 0x38
 hostname = f"pico-plant-monitor"
 network.hostname(hostname)
 WIFI_CONFIG_FILE = "wifi_config.json"
 CONFIG_FILE = "config.json"
 led = Pin("LED", Pin.OUT)
 led.value(1)
+i2c = I2C(1, scl=Pin(3), sda=Pin(2), freq=100000)
 
 
 
@@ -58,16 +58,13 @@ class CloudUpdater:
         self.updates_available = self.check_for_updates()
 
     def check_for_updates(self):
+        print("checking for updates..")
         self.version_config = self._load_file("version.json")
-        print("version config loaded")
         self.current_version = self.version_config["version"]
         self._download_file("version.json", "remote-version.json")
         self.remote_version_config = self._load_file("remote-version.json")
         self.remote_version = self.remote_version_config["version"]
-        print(f"Current version: {self.current_version}")
-        print(f"Remote version: {self.remote_version}")
         self.updates_available = self.remote_version > self.current_version
-        print(f"Updates available: {self.updates_available}")
         return self.updates_available
     
     def pretty_current_version(self):
@@ -90,33 +87,21 @@ class CloudUpdater:
         addr = socket.getaddrinfo(host, 443)[0][-1]
         s = socket.socket()
         s.connect(addr)
-
-        # Wrap the socket to add SSL/TLS
         s = ssl.wrap_socket(s, server_hostname=host)
-
-        # Send HTTP GET request
         request = 'GET {} HTTP/1.1\r\nHost: {}\r\nConnection: close\r\n\r\n'.format(path, host)
         s.write(request.encode('utf-8'))
-
-        # Read response headers and body
         response = b""
         while b"\r\n\r\n" not in response:
             response += s.read(1)
-        headers, body = response.split(b'\r\n\r\n', 1)
-
-        # Write the initial part of the body to the file
+        _, body = response.split(b'\r\n\r\n', 1)
         with open(local_file_name, 'wb') as file:
             file.write(body)
-
-            # Continue to read the rest of the file
             while True:
                 data = s.read(1024)
                 if not data:
                     break
                 file.write(data)
-
         s.close()
-        print(f"File downloaded to {local_file_name}")
 
     def _install_update(self):
         print("installing update..")
@@ -185,6 +170,7 @@ class CustomTimer:
                 self.unix_time = 946684800
         except Exception as e:
             print("Failed to update NTP time:", e)
+            self.unix_time = 946684800  # Default to Jan 1, 2000
 
     def get_current_unix_time(self):
         elapsed_time = time.ticks_diff(time.ticks_ms(), self.start_time) // 1000
@@ -194,13 +180,11 @@ class CustomTimer:
     def get_pretty_time(self):
         try:
             current_unix_time = self.get_current_unix_time()
-            # Adjust to UTC+3 safely
             adjusted_unix_time = current_unix_time + 3 * 3600
             datetime_tuple = utime.localtime(adjusted_unix_time)
             pretty_time = "{:04}-{:02}-{:02} {:02}:{:02}:{:02}".format(
                 *datetime_tuple[:6]
             )
-            # print('Current Date and Time (UTC+3):', pretty_time)
             return pretty_time
         except Exception as e:
             if "OverflowError" in str(e):
@@ -210,20 +194,15 @@ class CustomTimer:
 
 
 class StorageSensor:
-    def __init__(self):
-        pass
-
     def data_interface(self):
-        used_size, total_size = get_flash_memory_usage()
-        print(f"storage usage: {used_size} / {total_size}")
-        return used_size / 1000
+        return self.used_kilobytes()
 
     def used_kilobytes(self):
-        used_size, total_size = get_flash_memory_usage()
+        used_size, _ = get_flash_memory_usage()
         return used_size / 1000
 
     def total_kilobytes(self):
-        used_size, total_size = get_flash_memory_usage()
+        _, total_size = get_flash_memory_usage()
         return total_size / 1000
 
 
@@ -263,10 +242,7 @@ class MoistureSensor:
 class PicoTemperatureSensor:
     conversion_factor = 3.3 / (65535)
     temperature_sensor = ADC(4)
-
-    def __init__(self):
-        pass
-
+    
     def data_interface(self):
         return self.read_temperature()
 
@@ -297,9 +273,6 @@ class AHT10HumiditySensor:
 
     def read_temperature(self):
         return aht10.get_humidity()
-
-
-AHT10_I2C_ADDRESS = 0x38
 
 
 class AHT10:
@@ -351,12 +324,6 @@ class AHT10:
         humidity = ((data[1] << 16) | (data[2] << 8) | data[3]) >> 4
         humidity = (humidity * 100) / 1048576
         return humidity
-
-
-i2c = I2C(1, scl=Pin(3), sda=Pin(2), freq=100000)
-
-# Initialize the AHT10 sensor
-aht10 = AHT10(i2c)
 
 
 class PersistentList:
@@ -427,9 +394,6 @@ class SensorHistory:
         self.length = length
         self.history = buffer_list_with_zeros(self.history, 60)
 
-        # for _ in range(length):
-        #    self.add(0)
-
     def add(self, value):
         self.history.append(value)
         self.persistent_history.append(value)
@@ -442,7 +406,7 @@ class SensorHistory:
         return self.history
 
 
-def get_ntp_time(host="pool.ntp.org"):
+def get_ntp_time(host="pool.ntp.org"):  # TODO: make more robust
     # Reference time (Jan 1, 1970) in seconds since 1900 (NTP epoch)
     NTP_DELTA = 2208988800
     ntp_query = b"\x1b" + 47 * b"\0"
@@ -460,7 +424,7 @@ def get_ntp_time(host="pool.ntp.org"):
 
 
 def print_memory_usage():
-    collect()  # Run a garbage collection to free up memory
+    collect()
     total_memory = mem_alloc() + mem_free()
     used_memory = mem_alloc()
     free_memory = mem_free()
@@ -468,9 +432,6 @@ def print_memory_usage():
     print(f"Total memory: {total_memory} bytes")
     print(f"Used memory: {used_memory} bytes")
     print(f"Free memory: {free_memory} bytes")
-
-
-import uos
 
 
 def get_flash_memory_usage():
@@ -935,6 +896,9 @@ print("connecting to cloud..")
 cloud_updater = CloudUpdater()
 
 print("starting sensors..")
+# Initialize the AHT10 sensor
+aht10 = AHT10(i2c)
+
 pico_timer = CustomTimer()
 moisture_sensor = MoistureSensor(0.5, 3.3)
 moisture_sensor_history = SensorHistory("moisture.log", 60)
