@@ -41,6 +41,8 @@ function fetchData_chartName() {
         .then(response => response.json())
         .then(data => {
             chartName.data.labels = data.labels;
+            chartName.options.scales.y.min = data.min;
+            chartName.options.scales.y.max = data.max;
             chartName.data.datasets[0].data = data.values;
             chartName.update();
         })

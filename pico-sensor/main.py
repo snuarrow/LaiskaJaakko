@@ -206,6 +206,19 @@ class StorageSensor:
         return total_size / 1000
 
 
+class MemorySensor:
+    def data_interface(self):
+        return self.used_memory() / 1000  # convert to kilobytes
+
+    def used_memory(self):
+        used_memory = mem_alloc()
+        return used_memory
+
+    def free_memory(self):
+        free_memory = mem_free()
+        return free_memory
+
+
 class MoistureSensor:
     def __init__(self, voltage_0_percent, voltage_100_percent):
         self.adc_power_pin = Pin(20, Pin.OUT)
@@ -582,7 +595,8 @@ def handle_request(conn):
     global pico_temperature_sensor, pico_temperature_sensor_history, pico_temperature_monitor
     global aht10_temperature_monitor
     global aht10_humidity_monitor
-    global storage_sensor
+    global storage_sensor, storage_monitor
+    global memory_sensor, memory_monitor
     global version
     global pico_timer
     global cloud_updater
@@ -669,10 +683,45 @@ Content-Type: text/plain
         conn.close()
         return
 
+    if "GET /storage_data" in request:
+        labels = list(range(60))
+        labels.reverse()
+        data = {
+            "labels": labels,
+            "values": storage_monitor.get_data(),
+            "min": 0,
+            "max": 868,
+        }
+        response = json.dumps(data)
+        conn.send("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n")
+        conn.send(response)
+        conn.close()
+        return
+
+    if "GET /memory_data" in request:
+        labels = list(range(60))
+        labels.reverse()
+        data = {
+            "labels": labels,
+            "values": memory_monitor.get_data(),
+            "min": 0,
+            "max": 192,
+        }
+        response = json.dumps(data)
+        conn.send("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n")
+        conn.send(response)
+        conn.close()
+        return
+
     if "GET /moisture_data" in request:
         labels = list(range(60))
         labels.reverse()
-        data = {"labels": labels, "values": moisture_monitor.get_data()}
+        data = {
+            "labels": labels,
+            "values": moisture_monitor.get_data(),
+            "min": 0,
+            "max": 100,
+        }
         response = json.dumps(data)
         conn.send("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n")
         conn.send(response)
@@ -682,7 +731,12 @@ Content-Type: text/plain
     if "GET /pico_temperature_data" in request:
         labels = list(range(60))
         labels.reverse()
-        data = {"labels": labels, "values": pico_temperature_monitor.get_data()}
+        data = {
+            "labels": labels,
+            "values": pico_temperature_monitor.get_data(),
+            "min": 0,
+            "max": 40,
+        }
         response = json.dumps(data)
         conn.send("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n")
         conn.send(response)
@@ -692,7 +746,12 @@ Content-Type: text/plain
     if "GET /aht10_temperature_data" in request:
         labels = list(range(60))
         labels.reverse()
-        data = {"labels": labels, "values": aht10_temperature_monitor.get_data()}
+        data = {
+            "labels": labels,
+            "values": aht10_temperature_monitor.get_data(),
+            "min": 0,
+            "max": 40,
+        }
         response = json.dumps(data)
         conn.send("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n")
         conn.send(response)
@@ -702,7 +761,12 @@ Content-Type: text/plain
     if "GET /aht10_humidity_data" in request:
         labels = list(range(60))
         labels.reverse()
-        data = {"labels": labels, "values": aht10_humidity_monitor.get_data()}
+        data = {
+            "labels": labels,
+            "values": aht10_humidity_monitor.get_data(),
+            "min": 0,
+            "max": 100,
+        }
         response = json.dumps(data)
         conn.send("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n")
         conn.send(response)
@@ -821,6 +885,10 @@ Content-Type: text/html
         <script src="pico-chart.js?chartName=aht10TemperatureChart&chartPath=aht10_temperature_data&chartLabel=AHT10Temperature&initDelayMS=3000"></script>
         <canvas id="aht10HumidityChart" width="400" height="300"></canvas>
         <script src="pico-chart.js?chartName=aht10HumidityChart&chartPath=aht10_humidity_data&chartLabel=AHT10Humidity&initDelayMS=4000"></script>
+        <canvas id="storageChart" width="400" height="300"></canvas>
+        <script src="pico-chart.js?chartName=storageChart&chartPath=storage_data&chartLabel=StorageUsageKB&initDelayMS=5000"></script>
+        <canvas id="memoryChart" width="400" height="300"></canvas>
+        <script src="pico-chart.js?chartName=memoryChart&chartPath=memory_data&chartLabel=MemoryUsageKB&initDelayMS=6000"></script>
     </body>
 </html>
 """
@@ -863,6 +931,7 @@ def start_web_server():
                 print(pico_timer.get_pretty_time(), "Connection from", addr)
                 handle_request(conn)
                 conn.close()
+                collect()
             except Exception as e:
                 print("while true error:", e)
                 conn.close()
@@ -941,6 +1010,12 @@ aht10_humidity_monitor = SensorMonitor(
 )
 
 storage_sensor = StorageSensor()
+storage_sensor_history = SensorHistory("storage.log", 60)
+storage_monitor = SensorMonitor(storage_sensor, storage_sensor_history)
+
+memory_sensor = MemorySensor()
+memory_sensor_history = SensorHistory("memory.log", 60)
+memory_monitor = SensorMonitor(memory_sensor, memory_sensor_history)
 
 print("sensors initiated")
 
