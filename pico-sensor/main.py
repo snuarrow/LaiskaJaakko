@@ -612,7 +612,7 @@ def handle_request(conn):
         conn.close()
         return
 
-    if "POST /update_software" in request:
+    elif "POST /update_software" in request:
         if not cloud_updater.updates_available:
             conn.send("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n")
             conn.send(json.dumps({"status": "no updates available"}))
@@ -624,12 +624,12 @@ def handle_request(conn):
         cloud_updater.update()
         return
 
-    if "GET /chart.js" in request:
+    elif "GET /chart.js" in request:
         stream_file("chart.js", conn, "application/javascript")
         conn.close()
         return
 
-    if "GET /pico-chart.js" in request:
+    elif "GET /pico-chart.js" in request:
         response = serve_file("pico-chart.js")
         query_string = request.split(" ")[1].split("?", 1)[1]
         query_params = parse_query_params(query_string)
@@ -640,27 +640,27 @@ def handle_request(conn):
         conn.close()
         return
 
-    if "POST /setup_wifi" in request:
+    elif "POST /setup_wifi" in request:
         ssid_match = ure.search(r"ssid=([^&]*)", request)
         password_match = ure.search(r"password=([^&]*)", request)
         if ssid_match and password_match:
             ssid = ssid_match.group(1)
             password = password_match.group(1)
 
-    if "POST /led" in request:
+    elif "POST /led" in request:
         led.toggle()
         conn.send("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n")
         conn.send(json.dumps({"led": led.value()}))
         conn.close()
         return
 
-    if "POST /memory" in request:
+    elif "POST /memory" in request:
         print_memory_usage()
 
-    if "GET /time" in request:
+    elif "GET /time" in request:
         return get_ntp_time()
 
-    if (
+    elif (
         "GET /data" in request
     ):  # TODO: read from history instead to avoid corrosive wear on moisture sensor
         return_data = json.dumps(
@@ -678,12 +678,12 @@ Content-Type: text/plain
         conn.close()
         return response
 
-    if "GET /main.js" in request:
+    elif "GET /main.js" in request:
         stream_file("main.js", conn, "application/javascript")
         conn.close()
         return
 
-    if "GET /storage_data" in request:
+    elif "GET /storage_data" in request:
         labels = list(range(60))
         labels.reverse()
         data = {
@@ -698,7 +698,7 @@ Content-Type: text/plain
         conn.close()
         return
 
-    if "GET /memory_data" in request:
+    elif "GET /memory_data" in request:
         labels = list(range(60))
         labels.reverse()
         data = {
@@ -713,7 +713,7 @@ Content-Type: text/plain
         conn.close()
         return
 
-    if "GET /moisture_data" in request:
+    elif "GET /moisture_data" in request:
         labels = list(range(60))
         labels.reverse()
         data = {
@@ -728,7 +728,7 @@ Content-Type: text/plain
         conn.close()
         return
 
-    if "GET /pico_temperature_data" in request:
+    elif "GET /pico_temperature_data" in request:
         labels = list(range(60))
         labels.reverse()
         data = {
@@ -743,7 +743,7 @@ Content-Type: text/plain
         conn.close()
         return
 
-    if "GET /aht10_temperature_data" in request:
+    elif "GET /aht10_temperature_data" in request:
         labels = list(range(60))
         labels.reverse()
         data = {
@@ -758,7 +758,7 @@ Content-Type: text/plain
         conn.close()
         return
 
-    if "GET /aht10_humidity_data" in request:
+    elif "GET /aht10_humidity_data" in request:
         labels = list(range(60))
         labels.reverse()
         data = {
