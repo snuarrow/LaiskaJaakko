@@ -1,9 +1,9 @@
 {
-    "version": 24,
+    "version": 25,
     "files_included": [
-        "version.json",
         "main.js",
         "main.py",
-        "pico-chart.js"
+        "pico-chart.js",
+        "version.json"
     ]
 }

@@ -327,10 +327,11 @@ class AHT10:
 
 
 class PersistentList:
-    def __init__(self, filename, max_lines=None):
+    def __init__(self, filename, max_lines=None, tail_lines=10):
         self.filename = filename
         self.data = []
         self.max_lines = max_lines
+        self.tail_lines = tail_lines
         self._load_from_file()
 
     def get_content(self):
@@ -346,12 +347,12 @@ class PersistentList:
         else:
             try:
                 with open(self.filename, "rb") as file:
-                    self._read_last_n_lines(file, self.max_lines)
+                    self._read_last_n_lines(file)
             except:
                 self.data = []
 
-    def _read_last_n_lines(self, file, n):
-        with open(self.filename, "r") as f:
+    def _read_last_n_lines(self, file):
+        with open(self.filename, "r") as file:
             for line in file:
                 self.data.append(float(line.strip()))
                 if len(self.data) > self.max_lines:
@@ -359,8 +360,25 @@ class PersistentList:
 
     def append(self, item):
         self.data.append(item)
+        if len(self.data) > self.max_lines:
+            self.data.pop(0)
         with open(self.filename, "a") as file:
             file.write(f"{item}\n")
+        if self._history_file_length() > self.max_lines + self.tail_lines:
+            self._trim_history_file()
+
+    def _trim_history_file(self):
+        temporary_file_name = f"{self.filename}.tmp"
+        with open(temporary_file_name, "wb") as temporary_file:
+            print("trimming history:", self.filename)
+            for elem in self.data:
+                temporary_file.write(f"{elem}\n")
+        os.remove(self.filename)
+        os.rename(temporary_file_name, self.filename)
+
+    def _history_file_length(self):
+        with open(self.filename, "r") as file:
+            return sum(1 for _ in file)
 
     def __getitem__(self, index):
         return self.data[index]
