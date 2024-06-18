@@ -45,12 +45,12 @@ led.value(1)
 i2c = I2C(1, scl=Pin(3), sda=Pin(2), freq=100000)
 
 
-
-
 class CloudUpdater:
 
     branch: str = "main"
-    base_url: str = f"https://raw.githubusercontent.com/snuarrow/LaiskaJaakko/{branch}/pico-sensor/"
+    base_url: str = (
+        f"https://raw.githubusercontent.com/snuarrow/LaiskaJaakko/{branch}/pico-sensor/"
+    )
     current_version: int = 0
     updates_available: bool = False
 
@@ -66,7 +66,7 @@ class CloudUpdater:
         self.remote_version = self.remote_version_config["version"]
         self.updates_available = self.remote_version > self.current_version
         return self.updates_available
-    
+
     def pretty_current_version(self):
         return f"v.{self.current_version}"
 
@@ -81,20 +81,22 @@ class CloudUpdater:
     def _download_file(self, remote_file_name, local_file_name):
         https_file_url = f"{self.base_url}{remote_file_name}"
         print(f"Downloading file.. {https_file_url}")
-        _, _, host, path = https_file_url.split('/', 3)
-        path = '/' + path
+        _, _, host, path = https_file_url.split("/", 3)
+        path = "/" + path
 
         addr = socket.getaddrinfo(host, 443)[0][-1]
         s = socket.socket()
         s.connect(addr)
         s = ssl.wrap_socket(s, server_hostname=host)
-        request = 'GET {} HTTP/1.1\r\nHost: {}\r\nConnection: close\r\n\r\n'.format(path, host)
-        s.write(request.encode('utf-8'))
+        request = "GET {} HTTP/1.1\r\nHost: {}\r\nConnection: close\r\n\r\n".format(
+            path, host
+        )
+        s.write(request.encode("utf-8"))
         response = b""
         while b"\r\n\r\n" not in response:
             response += s.read(1)
-        _, body = response.split(b'\r\n\r\n', 1)
-        with open(local_file_name, 'wb') as file:
+        _, body = response.split(b"\r\n\r\n", 1)
+        with open(local_file_name, "wb") as file:
             file.write(body)
             while True:
                 data = s.read(1024)
@@ -166,7 +168,9 @@ class CustomTimer:
             self.unix_time = new_unix_time
             print("NTP Time Updated:", new_unix_time)
             if new_unix_time < 0:
-                print("NTP time is negative, defaulting to Jan 1 2000")  # TODO: this is a temporary fix, find out why NTP time is occasionally negative
+                print(
+                    "NTP time is negative, defaulting to Jan 1 2000"
+                )  # TODO: this is a temporary fix, find out why NTP time is occasionally negative
                 self.unix_time = 946684800
         except Exception as e:
             print("Failed to update NTP time:", e)
@@ -255,7 +259,7 @@ class MoistureSensor:
 class PicoTemperatureSensor:
     conversion_factor = 3.3 / (65535)
     temperature_sensor = ADC(4)
-    
+
     def data_interface(self):
         return self.read_temperature()
 
