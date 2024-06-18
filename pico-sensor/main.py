@@ -21,7 +21,7 @@ import struct
 import time
 import utime
 from time import sleep
-from os import remove
+from os import remove, rename
 import ssl
 import json
 from machine import Pin, ADC, Timer, I2C, freq, reset
@@ -373,8 +373,8 @@ class PersistentList:
             print("trimming history:", self.filename)
             for elem in self.data:
                 temporary_file.write(f"{elem}\n")
-        os.remove(self.filename)
-        os.rename(temporary_file_name, self.filename)
+        remove(self.filename)
+        rename(temporary_file_name, self.filename)
 
     def _history_file_length(self):
         with open(self.filename, "r") as file:
