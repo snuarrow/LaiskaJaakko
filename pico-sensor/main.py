@@ -72,6 +72,9 @@ class CloudUpdater:
 
     def update(self, timer=None):
         print("updating..")
+        global update_mutex
+        update_mutex = True
+        sleep(3)
         self.version_config = self._load_file("version.json")
         for file in self.version_config["files_included"]:
             print(f"downloading {file}")
@@ -966,11 +969,17 @@ def ensure_connectivity(timer=None):  # timed function which keeps wifi connecti
     else:
         print(pico_timer.get_pretty_time(), f"wifi ok: {wlan.ifconfig()}")
 
-
+update_mutex = False
 def periodic_restart(timer=None):
+    global update_mutex
+    if update_mutex:
+        print("cancelling periodic restart, update is running")
+        return
     print("restarting in 10..")
     sleep(10)
-    reset()
+    if not update_mutex:
+        reset()
+    print("periodic restart cancelled, update is running")
 
 
 # Start the access point and web server
@@ -1026,5 +1035,8 @@ print("sensors initiated")
 ensure_connectivity()
 wifi_check_timer = Timer()
 wifi_check_timer.init(period=60000, mode=Timer.PERIODIC, callback=ensure_connectivity)
+
+periodic_restart_timer = Timer()
+periodic_restart_timer.init(period=84600, mode=Timer.PERIODIC, callback=periodic_restart)
 
 start_web_server()
