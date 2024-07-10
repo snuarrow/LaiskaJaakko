@@ -21,18 +21,19 @@ import struct
 import time
 import utime
 from time import sleep
+import os
 from os import remove, rename
 import ssl
 import json
 from machine import Pin, ADC, Timer, I2C, freq, reset
 from gc import collect, mem_alloc, mem_free
 import uos
+import sys
 
 # periodic_restart_timer = Timer()
 # periodic_restart_timer.init(period=60*60*1000, mode=Timer.PERIODIC, callback=periodic_restart)
 
-
-frequency_MHz = 64
+frequency_MHz = 125
 freq(frequency_MHz * 1000000)
 print("Current frequency: ", freq() / 1000000, "MHz")
 AHT10_I2C_ADDRESS = 0x38
@@ -518,45 +519,6 @@ def delete_wifi_config():
         print("Error deleting configuration file:", e)
 
 
-ap = network.WLAN(network.AP_IF)
-
-
-# Function to start the Wi-Fi access point
-def start_ap(ssid="iot", password="laiskajaakko"):
-    ap.config(essid=ssid, password=password)
-    ap.active(True)
-    while ap.active() == False:
-        pass
-    print("Access point active")
-    print(ap.ifconfig())
-
-
-# Function to connect to an external Wi-Fi network
-wlan = None
-
-
-def connect_to_wifi(ssid, password):
-    global wlan
-    ap.active(False)
-    print("shutting down ap")
-    wlan = network.WLAN(network.STA_IF)
-    wlan.active(True)
-    print("waiting wifi to start")
-    wlan.connect(ssid, password)
-    print("connecting..")
-    for i in range(10):
-        if wlan.isconnected():
-            break
-        sleep(1)
-    if not wlan.isconnected():
-        delete_wifi_config()
-        return
-    print("Connected to", ssid)
-    print(wlan.ifconfig())
-    save_wifi_config(ssid, password)
-    print("Saved wifi credentials")
-
-
 def load_chart(given_id: str):
     pass
 
@@ -605,12 +567,18 @@ def handle_request(conn):
     global storage_sensor, storage_monitor
     global memory_sensor, memory_monitor
     global version
-    global pico_timer
     global cloud_updater
+    global friend_finder
     request = conn.recv(1024)
     request = str(request)
     ssid = None
     password = None
+
+    if "GET /health" in request:
+        conn.send("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n")
+        conn.send(json.dumps({"type": "pico-health", "status": "ok"}))
+        conn.close()
+        return
 
     if "GET /updates_available" in request:
         conn.send("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n")
@@ -653,6 +621,14 @@ def handle_request(conn):
         if ssid_match and password_match:
             ssid = ssid_match.group(1)
             password = password_match.group(1)
+            ssid = ssid.replace("+", " ")
+            password = password.replace("'", "")
+            print("SSID:", ssid)
+            print("Password:", password)
+            save_wifi_config(ssid, password)
+            conn.send("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n")
+            conn.send(json.dumps({"status": "ok"}))
+            reset()
 
     elif "POST /led" in request:
         led.toggle()
@@ -862,6 +838,8 @@ Content-Type: text/html
         <h1>{given_name}</h1>
         <p>Laiska-Jaakko Plant Monitor</p>
         <p>device-uuid: {uuid}</p>
+        <h3>Other Devices in the Network</h3>
+        <p>{friend_finder.get_friends()}</p>
         <h3>Wi-Fi Setup</h3>
         <form action="/setup_wifi" method="post">
             <label for="ssid">SSID:</label><br>
@@ -902,14 +880,6 @@ Content-Type: text/html
     conn.send(response)
     conn.close()
 
-    if ssid and password:
-        ssid = ssid.replace("+", " ")
-        password = password.replace("'", "")
-        print("SSID:", ssid)
-        print("Password:", password)
-        connect_to_wifi(ssid, password)
-        start_web_server()
-
 
 # Main function to start the web server
 s = None
@@ -941,6 +911,7 @@ def start_web_server():
                 collect()
             except Exception as e:
                 print("while true error:", e)
+                sys.print_exception(e)
                 conn.close()
                 if "[Errno 110] ETIMEDOUT" in str(e):
                     continue
@@ -954,23 +925,11 @@ def start_web_server():
         s.close()
 
 
-def ensure_connectivity(timer=None):  # timed function which keeps wifi connection alive
-    collect()
-    global wlan, s, conn, pico_timer
-    if wlan and not wlan.isconnected():
-        print("connection lost, restarting..")
-        ssid, password = load_wifi_config()
-        if s:
-            s.close()
-            s = None
-            sleep(10)
-        connect_to_wifi(ssid, password)
-        start_web_server()
-    else:
-        print(pico_timer.get_pretty_time(), f"wifi ok: {wlan.ifconfig()}")
-
 update_mutex = False
+
+
 def periodic_restart(timer=None):
+    print("periodic restart called")
     global update_mutex
     if update_mutex:
         print("cancelling periodic restart, update is running")
@@ -982,24 +941,182 @@ def periodic_restart(timer=None):
     print("periodic restart cancelled, update is running")
 
 
-# Start the access point and web server
-ssid, password = load_wifi_config()
-print(f"ssid: {ssid}")
+def http_get(url, timeout=5):
+    if url.startswith("https://"):
+        protocol = "https"
+        port = 443
+        url = url[8:]
+    elif url.startswith("http://"):
+        protocol = "http"
+        port = 80
+        url = url[7:]
+    else:
+        raise ValueError("URL must start with 'http://' or 'https://'")
+    host, path = url.split("/", 1)
+    path = "/" + path
+    addr_info = socket.getaddrinfo(host, port)[0][-1]
+    s = socket.socket()
+    s.settimeout(timeout)
+    s.connect(addr_info)
+    if protocol == "https":
+        s = ssl.wrap_socket(s, server_hostname=host)
+    s.sendall(
+        bytes(
+            "GET {} HTTP/1.1\r\nHost: {}\r\nConnection: close\r\n\r\n".format(
+                path, host
+            ),
+            "utf-8",
+        )
+    )
+    response = b""
+    while True:
+        data = s.recv(1024)
+        if not data:
+            break
+        response += data
+    s.close()
+    response = response.decode("utf-8")
+    header, body = response.split("\r\n\r\n", 1)
+    status_code = int(header.split()[1])
+    if status_code == 200:
+        return json.loads(body)
+    else:
+        raise Exception("HTTP request failed with status code: {}".format(status_code))
 
 
-if ssid and password:
-    connect_to_wifi(ssid, password)
-else:
-    start_ap()
+class NetworkConnection:
+    wlan = None
+    ap = None
+    ssid = None
+    password = None
+    ap_ssid = "iot"
+    ap_password = "laiskajaakko"
 
-print("connecting to cloud..")
-cloud_updater = CloudUpdater()
+    def __init__(self):
+        self.ssid, self.password = load_wifi_config()
+        self.timer = Timer()
+        self.timer.init(
+            period=20000, mode=Timer.PERIODIC, callback=self.check_connectivity
+        )
+        if self.ssid and self.password:
+            self.connect_to_wifi()
+        else:
+            self.start_ap()
+
+    def ap_active(self):
+        return self.ap and self.ap.active()
+
+    def wlan_active(self):
+        return self.wlan and self.wlan.isconnected()
+
+    def start_ap(self):
+        if self.wlan:
+            self.wlan.active(False)
+            for _ in range(10):
+                if not self.wlan.active():
+                    break
+                sleep(1)
+        self.ap = network.WLAN(network.AP_IF)
+        self.ap.config(essid=self.ap_ssid, password=self.ap_password)
+        self.ap.active(True)
+        for _ in range(10):
+            if self.ap.active():
+                break
+            sleep(1)
+        print(f"Access point active: {self.ap.ifconfig()}")
+
+    def connect_to_wifi(self):
+        if self.ap:
+            self.ap.active(False)
+        self.wlan = network.WLAN(network.STA_IF)
+        self.wlan.active(True)
+        self.wlan.connect(self.ssid, self.password)
+        print(f"Connecting to wifi: {self.ssid}")
+        for _ in range(10):
+            if self.wlan.isconnected():
+                print(f"Connected to: {self.ssid}, {self.wlan.ifconfig()}")
+                return
+            sleep(1)
+        print(f"Failed to connect to: {self.ssid}")
+
+    def check_connectivity(self, timer=None):
+        if self.wlan and not self.wlan.isconnected():
+            print("connection lost, reconnecting to wifi..")
+            self.connect_to_wifi()
+        else:
+            print(f"wifi ok: {self.wlan.ifconfig()}")
+
+
+class FriendFinder:
+    friends = {}
+    next_host_id = 14
+    my_ip = ""
+    gateway = ""
+
+    def __init__(self, network_connection: NetworkConnection):
+        try:
+            with open("friends.json", "r") as f:
+                self.friends = json.load(f)
+        except:
+            self.friends = {}
+        self.network_connection = network_connection
+        self.my_ip = self.network_connection.wlan.ifconfig()[0]
+        self.gateway = self.network_connection.wlan.ifconfig()[2]
+        self.timer = Timer()
+        self.timer.init(
+            period=10000, mode=Timer.PERIODIC, callback=self.find_friends
+        )  # every 10 seconds
+
+    def get_friends(self):
+        friend_string = ""
+        for friend_ip, status in self.friends.items():
+            friend_string += f'<a href="{friend_ip}">{friend_ip}</a>: {status}\n'
+        return friend_string
+
+    def get_friends_with_health_check(self):
+        for friend_ip in self.friends:
+            url = f"http://{friend_ip}/health"
+            try:
+                response = http_get(url)
+                if response["type"] == "pico-health":
+                    self.friends[friend_ip] = "ok"
+                    continue
+            except:
+                pass
+            self.friends[friend_ip] = "error"
+        return self.friends
+
+    def find_friends(self, timer=None):
+        if not self.network_connection.wlan_active():
+            print("wifi not active, skipping friend finder")
+            return
+        octets = self.my_ip.split(".")
+        if self.next_host_id > 255:
+            self.next_host_id = 1
+        ip = f"{octets[0]}.{octets[1]}.{octets[2]}.{self.next_host_id}"
+
+        while ip == self.my_ip or ip == self.gateway:
+            self.next_host_id += 1
+            ip = f"{octets[0]}.{octets[1]}.{octets[2]}.{self.next_host_id}"
+        url = f"http://{ip}/health"
+        print(f"GET {url}")
+        try:
+            response = http_get(url, timeout=3)
+            if response["type"] == "pico-health":
+                print(f"found friend: {ip}")
+                self.friends[ip] = "ok"
+                with open("friends.json", "w") as f:
+                    json.dump(self.friends, f)
+        except:
+            pass
+        self.next_host_id += 1
+
 
 print("starting sensors..")
 # Initialize the AHT10 sensor
 aht10 = AHT10(i2c)
 
-pico_timer = CustomTimer()
+
 moisture_sensor = MoistureSensor(0.5, 3.3)
 moisture_sensor_history = SensorHistory("moisture.log", 60)
 moisture_monitor = SensorMonitor(moisture_sensor, moisture_sensor_history)
@@ -1029,14 +1146,29 @@ storage_monitor = SensorMonitor(storage_sensor, storage_sensor_history)
 memory_sensor = MemorySensor()
 memory_sensor_history = SensorHistory("memory.log", 60)
 memory_monitor = SensorMonitor(memory_sensor, memory_sensor_history)
-
 print("sensors initiated")
 
-ensure_connectivity()
-wifi_check_timer = Timer()
-wifi_check_timer.init(period=60000, mode=Timer.PERIODIC, callback=ensure_connectivity)
+network_connection = NetworkConnection()
+
+while True:
+    if network_connection.ap_active():
+        start_web_server()
+        break
+
+    if network_connection.wlan_active():
+        break
+
+    sleep(5)
+
+print("connecting to cloud..")
+pico_timer = CustomTimer()
+cloud_updater = CloudUpdater()
+friend_finder = FriendFinder(network_connection)
+
 
 periodic_restart_timer = Timer()
-periodic_restart_timer.init(period=84600, mode=Timer.PERIODIC, callback=periodic_restart)
+periodic_restart_timer.init(
+    period=86400000, mode=Timer.PERIODIC, callback=periodic_restart
+)
 
 start_web_server()
