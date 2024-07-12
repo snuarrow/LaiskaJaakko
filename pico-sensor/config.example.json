@@ -1,0 +1,67 @@
+{
+    "uuid": null,
+    "name": "YöPerho",
+    "secret": "secret",
+    "hostname": "plant-monitor",
+    "cloud_host": "http://localhost:3000",
+    "sensors": [
+        {
+            "uuid": null,
+            "name": "Moisture 1",
+            "type": "MH-Moisture",
+            "min_voltage": 0.5,
+            "max_voltage": 3.3,
+            "power_pin": 0,
+            "adc_pin": 0,
+            "log_file": "moisture1.log"
+        },
+        {
+            "uuid": null,
+            "name": "Moisture 2",
+            "type": "MH-Moisture",
+            "min_voltage": 0.5,
+            "max_voltage": 3.3,
+            "power_pin": 0,
+            "adc_pin": 1,
+            "log_file": "moisture2.log"
+        },
+        {
+            "uuid": null,
+            "name": "Moisture 3",
+            "type": "MH-Moisture",
+            "min_voltage": 0.5,
+            "max_voltage": 3.3,
+            "power_pin": 0,
+            "adc_pin": 1,
+            "log_file": "moisture3.log"
+        },
+        {
+            "uuid": null,
+            "name": "AHT10 Temperature",
+            "type": "AHT10Temperature",
+            "i2c_address": "0x38",
+            "i2c_bus": 0,
+            "i2c_sda_pin": 0,
+            "i2c_scl_pin": 0,
+            "power_pin": 0,
+            "log_file": "aht10_temperature.log"
+        },
+        {
+            "uuid": null,
+            "name": "AHT10 Humidity",
+            "type": "AHT10Humidity",
+            "i2c_address": "0x38",
+            "i2c_bus": 0,
+            "i2c_sda_pin": 0,
+            "i2c_scl_pin": 0,
+            "power_pin": 0,
+            "log_file": "aht10_humidity.log"
+        },
+        {
+            "uuid": null,
+            "name": "Pico Temperature",
+            "type": "PicoTemperature",
+            "log_file": "pico_temperature.log"
+        }
+    ]
+}
