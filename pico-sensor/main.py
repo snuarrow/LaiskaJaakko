@@ -28,6 +28,7 @@ import json
 from machine import Pin, ADC, Timer, I2C, freq, reset
 from gc import collect, mem_alloc, mem_free
 import uos
+import ubinascii
 import sys
 
 # periodic_restart_timer = Timer()
@@ -36,15 +37,20 @@ import sys
 frequency_MHz = 125
 freq(frequency_MHz * 1000000)
 print("Current frequency: ", freq() / 1000000, "MHz")
-AHT10_I2C_ADDRESS = 0x38
+#AHT10_I2C_ADDRESS = 0x38
+HISTORY_LENGTH = 60
 hostname = f"pico-plant-monitor"
 network.hostname(hostname)
 WIFI_CONFIG_FILE = "wifi_config.json"
 CONFIG_FILE = "config.json"
 led = Pin("LED", Pin.OUT)
 led.value(1)
-i2c = I2C(1, scl=Pin(3), sda=Pin(2), freq=100000)
 
+
+def generate_uuid():
+    random_bytes = uos.urandom(16)
+    uuid = ubinascii.hexlify(random_bytes).decode()
+    return f'{uuid[:8]}-{uuid[8:12]}-{uuid[12:16]}-{uuid[16:20]}-{uuid[20:]}'
 
 class CloudUpdater:
 
@@ -228,11 +234,13 @@ class MemorySensor:
 
 
 class MoistureSensor:
-    def __init__(self, voltage_0_percent, voltage_100_percent):
-        self.adc_power_pin = Pin(20, Pin.OUT)
-        self.adc = ADC(Pin(26))
+    def __init__(self, power_pin: int, adc_pin: int, voltage_0_percent: float, voltage_100_percent: float, name: str, uuid: str):
+        self.adc_power_pin = Pin(power_pin, Pin.OUT)
+        self.adc = ADC(Pin(adc_pin))
         self.voltage_0_percent = voltage_0_percent
         self.voltage_100_percent = voltage_100_percent
+        self.name = name
+        self.uuid = uuid
 
     def data_interface(self):
         return self.percentage()
@@ -297,14 +305,23 @@ class AHT10HumiditySensor:
 
 
 class AHT10:
-    def __init__(self, i2c):
-        self.i2c = i2c
+    def __init__(self, i2c_address, i2c_bus, i2c_sda_pin, i2c_scl_pin, power_pin):
+        self.i2c_address = i2c_address
+        self.power_pin = Pin(power_pin, Pin.OUT)
+        self.power_pin.value(1)  # power on AHT10
+        time.sleep(0.1) # waith for AHT10 power up
+        self.i2c = I2C(
+            i2c_bus,
+            scl=Pin(i2c_scl_pin),
+            sda=Pin(i2c_sda_pin),
+            freq=100000
+        )
         self.init_sensor()
 
     def init_sensor(self):
         for i in range(10):
             try:
-                self.i2c.writeto(AHT10_I2C_ADDRESS, b"\xE1\x08\x00")
+                self.i2c.writeto(self.i2c_address, b"\xE1\x08\x00")
                 time.sleep(0.05)
                 break
             except OSError as e:
@@ -315,9 +332,9 @@ class AHT10:
     def read_data(self):
         for i in range(10):
             try:
-                self.i2c.writeto(AHT10_I2C_ADDRESS, b"\xAC\x33\x00")
+                self.i2c.writeto(self.i2c_address, b"\xAC\x33\x00")
                 time.sleep(0.05)
-                data = self.i2c.readfrom(AHT10_I2C_ADDRESS, 6)
+                data = self.i2c.readfrom(self.i2c_address, 6)
                 return data
             except OSError as e:
                 if i < 9:
@@ -493,6 +510,11 @@ def load_config():
             return config["uuid"], config["givenName"]
     except:
         return "undefined-uuid", "undefined given name"
+
+
+def save_config(updated_config: dict):
+    with open(CONFIG_FILE, "w") as f:
+        json.dump(updated_config, f)
 
 
 def save_wifi_config(ssid, password):
@@ -1112,10 +1134,64 @@ class FriendFinder:
         self.next_host_id += 1
 
 
+class Sensors:
+    sensors = {}
+    sensor_histories = {}
+    sensor_monitors = {}
+    def get_sensor(self, uuid):
+        return self.sensors.get(uuid)
+
+    def __init__(self):
+        with open("config.json", "r") as f:
+            config = json.load(f)
+        for configured_sensor in config.get("sensors"):
+            if not configured_sensor.get("uuid"):
+                configured_sensor.update({"uuid": generate_uuid()})
+                save_config(config)
+            sensor_type = configured_sensor.get("type")
+            if sensor_type == "MH-Moisture":
+                sensor = MoistureSensor(
+                    power_pin=configured_sensor.get("power_pin"),
+                    adc_pin=configured_sensor.get("adc_pin"),
+                    voltage_0_percent=configured_sensor.get("min_voltage"),
+                    voltage_100_percent=configured_sensor.get("max_voltage"),
+                    name=configured_sensor.get("name"),
+                    uuid=configured_sensor.get("uuid"),
+                )
+                self.sensors[configured_sensor.get("uuid")] = sensor
+                self.sensor_histories[configured_sensor.get("uuid")] = SensorHistory(
+                    filename=configured_sensor.get("log_file"),
+                    length=HISTORY_LENGTH,
+                )
+                continue
+            elif sensor_type == "AHT10Temperature":
+                sensor = AHT10TemperatureSensor(AHT10(
+                    i2c_address=configured_sensor["i2c_address"],
+                    i2c_bus=configured_sensor["i2c_bus"],
+                    i2c_sda_pin=configured_sensor["i2c_sda_pin"],
+                    i2c_scl_pin=configured_sensor["i2c_scl_pin"],
+                    power_pin=configured_sensor["power_pin"],
+                ))
+                self.sensors[configured_sensor.get("uuid")] = sensor
+                continue
+            elif sensor_type == "AHT10Humidity":
+                sensor = AHT10HumiditySensor(AHT10(
+                    i2c_address=configured_sensor["i2c_address"],
+                    i2c_bus=configured_sensor["i2c_bus"],
+                    i2c_sda_pin=configured_sensor["i2c_sda_pin"],
+                    i2c_scl_pin=configured_sensor["i2c_scl_pin"],
+                    power_pin=configured_sensor["power_pin"],
+                ))
+            elif sensor_type == "PicoTemperature":
+                sensor = PicoTemperatureSensor()
+                self.sensors[configured_sensor.get("uuid")] = sensor
+                continue
+
 print("starting sensors..")
 # Initialize the AHT10 sensor
-aht10 = AHT10(i2c)
+#aht10 = AHT10(i2c)
 
+sensors = Sensors()
 
 moisture_sensor = MoistureSensor(0.5, 3.3)
 moisture_sensor_history = SensorHistory("moisture.log", 60)
