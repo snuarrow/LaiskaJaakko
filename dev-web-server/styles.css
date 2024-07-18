@@ -1,20 +1,18 @@
 body {
     font-family: Arial, sans-serif;
     margin: 0;
-    padding: 0;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 100vh;
+    padding: 20px;
     background-color: #f0f0f0;
 }
 
 .container {
-    max-width: 1200px;
+    max-width: 800px;
     width: 100%;
     background: #fff;
+    padding: 20px;
     box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
     border-radius: 8px;
+    margin: 0 auto;
 }
 
 h1 {
@@ -27,7 +25,15 @@ p {
     color: #666;
 }
 
-canvas {
-    display: block;
+.chart-container-wrapper {
+    background: #fff;
+    padding: 20px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
+    margin: 20px 0;
+}
+
+.chart-container {
+    max-width: 800px;
     margin: 20px auto;
 }
