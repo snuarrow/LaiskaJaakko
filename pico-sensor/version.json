@@ -4,6 +4,7 @@
         "main.js",
         "main.py",
         "pico-chart.js",
-        "version.json"
+        "version.json",
+        "typing.py"
     ]
 }

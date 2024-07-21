@@ -14,6 +14,27 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+function updateGivenName(name) {
+    console.log("updateGivenName() called");
+    const givenNameElement = document.getElementById('given-name');
+    givenNameElement.innerText = name;
+};
+
+function updateUUID(uuid) {
+    const uuidElement = document.getElementById('uuid');
+    uuidElement.innerText = uuid;
+}
+
+window.onload = function() {
+    fetch('/device_meta')
+        .then(response => response.json())
+        .then(responseData => {
+            console.log("response data:", responseData);
+            updateGivenName(responseData.name);
+            updateUUID(responseData.uuid);
+        })
+};
+
 function toggleLed() {
     console.log("toggle led");
     var xhr = new XMLHttpRequest();

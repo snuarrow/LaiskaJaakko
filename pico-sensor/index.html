@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>00 Plant Monitor</title>
+        <link rel="stylesheet" href="styles.css">
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+        <script src=main.js></script>
+        <script src=pico-charts.js></script>
+    </head>
+    <body style="background-color: rgb(240, 240, 240);">
+        <h1 id="given-name"></h1>
+        <p>Laiska-Jaakko Plant Monitor</p>
+        <p id="uuid"></p>
+        <h3>Other Devices in the Network</h3>
+        <p>feature deactivated</p>
+        <h3>Wi-Fi Setup</h3>
+        <form action="/setup_wifi" method="post">
+            <label for="ssid">SSID:</label><br>
+            <input type="text" id="ssid" name="ssid"><br>
+            <label for="password">Password:</label><br>
+            <input type="text" id="password" name="password"><br><br>
+            <input type="submit" value="Submit">
+        </form>
+        <h3>Led Control</h3>
+        <label class="switch">
+            <input type="checkbox" id="toggle" checked onclick="toggleLed()">
+            <span class="slider round"></span>
+        </label>
+        <h3>System</h3>
+        <p>feature deactivated</p>
+        <p>used storage: {storage_sensor.used_kilobytes()} / {storage_sensor.total_kilobytes()} KB</p>
+        <form action="/memory" method="post">
+            <button onclick="print_memory_usage()">Print memory usage</button>
+        </form>
+        <h1>Live Data Plot</h1>
+        <div class="chart-container-wrapper" id="chart-wrapper">
+        </div>
+    </body>
+</html>
