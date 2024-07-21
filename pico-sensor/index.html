@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>00 Plant Monitor</title>
+        <link rel="stylesheet" href="styles.css">
+        <script>
+            const scriptUrls = [
+                'https://cdn.jsdelivr.net/npm/chart.js',
+                'https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns',
+                'main.js',
+                'pico-charts.js'
+            ]; // Replace with the path to your JavaScript file
+            const maxRetries = 3; // Set the maximum number of retries
+    
+            function loadScriptWithRetry(url, retries) {
+                return new Promise((resolve, reject) => {
+                    const script = document.createElement('script');
+                    script.src = url;
+                    
+                    script.onload = () => {
+                        console.log(`Script loaded successfully: ${url}`);
+                        resolve();
+                    };
+    
+                    script.onerror = () => {
+                        if (retries > 0) {
+                            console.log(`Failed to load script. Retrying... (${retries} attempts left)`);
+                            resolve(loadScriptWithRetry(url, retries - 1));
+                        } else {
+                            console.error(`Failed to load script after ${maxRetries} attempts.`);
+                            reject(new Error(`Failed to load script: ${url}`));
+                        }
+                    };
+    
+                    document.head.appendChild(script);
+                });
+            }
+    
+            // Load the script with retries
+            for (const scriptUrl of scriptUrls) {
+                loadScriptWithRetry(scriptUrl, maxRetries)
+                    .then(() => {
+                        console.log('Script loaded successfully after retries if necessary.');
+                    })
+                    .catch(error => {
+                        console.error('Script failed to load:', error);
+                    });
+            }
+            //loadScriptWithRetry(scriptUrl, maxRetries)
+            //    .then(() => {
+            //        console.log('Script loaded successfully after retries if necessary.');
+            //    })
+            //    .catch(error => {
+            //        console.error('Script failed to load:', error);
+            //    });
+        </script>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+        <script src=main.js></script>
+        <script src=pico-charts.js></script>
+    </head>
+    <body style="background-color: rgb(240, 240, 240);">
+        <h1 id="given-name"></h1>
+        <p>Laiska-Jaakko Plant Monitor</p>
+        <p id="uuid"></p>
+        <h3>Other Devices in the Network</h3>
+        <p>feature deactivated</p>
+        <h3>Wi-Fi Setup</h3>
+        <form action="/setup_wifi" method="post">
+            <label for="ssid">SSID:</label><br>
+            <input type="text" id="ssid" name="ssid"><br>
+            <label for="password">Password:</label><br>
+            <input type="text" id="password" name="password"><br><br>
+            <input type="submit" value="Submit">
+        </form>
+        <h3>Led Control</h3>
+        <label class="switch">
+            <input type="checkbox" id="toggle" checked onclick="toggleLed()">
+            <span class="slider round"></span>
+        </label>
+        <h3>System</h3>
+        <p>feature deactivated</p>
+        <p>used storage: {storage_sensor.used_kilobytes()} / {storage_sensor.total_kilobytes()} KB</p>
+        <form action="/memory" method="post">
+            <button onclick="print_memory_usage()">Print memory usage</button>
+        </form>
+        <h1>Live Data Plot</h1>
+        <div class="chart-container-wrapper" id="chart-wrapper">
+        </div>
+    </body>
+</html>

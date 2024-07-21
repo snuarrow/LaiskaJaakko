@@ -14,6 +14,47 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+async function fetchWithRetry(url, options = {}, retries = 3, backoff = 3000) {
+    try {
+        const response = await fetch(url, options);
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        return response; // or response.json() if you want to parse the JSON body
+    } catch (error) {
+        if (retries > 0) {
+            console.log(`Retrying... attempts left: ${retries}`);
+            await new Promise((resolve) => setTimeout(resolve, backoff)); // wait before retrying
+            return fetchWithRetry(url, options, retries - 1, backoff * 2); // retry with exponential backoff
+        } else {
+            throw new Error(`Max retries reached. Error: ${error.message}`);
+        }
+    }
+}
+
+function updateGivenName(name) {
+    console.log("updateGivenName() called");
+    const givenNameElement = document.getElementById('given-name');
+    givenNameElement.innerText = name;
+};
+
+function updateUUID(uuid) {
+    const uuidElement = document.getElementById('uuid');
+    uuidElement.innerText = uuid;
+}
+
+window.onload = function() {
+    fetchWithRetry('/device_meta', { method: 'GET' })
+        .then(response => response.json())
+        .then(responseData => {
+            console.log("response data:", responseData);
+            updateGivenName(responseData.name);
+            updateUUID(responseData.uuid);
+        })
+};
+
 function toggleLed() {
     console.log("toggle led");
     var xhr = new XMLHttpRequest();
