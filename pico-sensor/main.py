@@ -40,14 +40,14 @@ frequency_MHz = 125
 freq(frequency_MHz * 1000000)
 print("Current frequency: ", freq() / 1000000, "MHz")
 # AHT10_I2C_ADDRESS = 0x38
-HISTORY_LENGTH = 60
-SAMPLING_FREQUENCY_SECONDS = 60
+HISTORY_LENGTH = 144
+SAMPLING_FREQUENCY_SECONDS = 600
 hostname = f"pico-plant-monitor"
 network.hostname(hostname)
 WIFI_CONFIG_FILE = "wifi_config.json"
 CONFIG_FILE = "config.json"
 led = Pin("LED", Pin.OUT)
-led.value(1)
+led.value(0)
 
 
 def generate_uuid():
@@ -138,6 +138,7 @@ class StatusLed:
         self.blue_pin_number = led_config["blue_pin"]
         self.red_pin_number = led_config["red_pin"]
         self.green_pin_number = led_config["green_pin"]
+        self.timer = Timer(-1)
         self.disco_start()
         self.disco_stop()
         self.disco_start()
@@ -149,6 +150,59 @@ class StatusLed:
         self.red.duty_u16(random_red)
         self.green.duty_u16(random_green)
         self.blue.duty_u16(random_blue)
+
+    def signal_wifi_reset(self):
+        self.disco_stop()
+        self.red_pin = Pin(self.red_pin_number)
+        for _ in range(10):
+            self.red_pin.value(1)
+            sleep(0.05)
+            self.red_pin.value(0)
+            sleep(0.2)
+
+    def signal_wifi_set(self):
+        self.disco_stop()
+        self.green_pin = Pin(self.green_pin_number)
+        for _ in range(10):
+            self.green_pin.value(1)
+            sleep(0.05)
+            self.green_pin.value(0)
+            sleep(0.2)
+
+    def ap_mode_cycle(self, timer=None):
+        if self.lit:
+            self.red.duty_u16(0)
+            self.green.duty_u16(0)
+            self.blue.duty_u16(0)
+            self.lit = 0
+        else:
+            self.red.duty_u16(0)
+            self.green.duty_u16(0)
+            self.blue.duty_u16(1000)
+            self.lit = 1
+
+    def ap_mode_start(self):
+        self.blue_pin = Pin(self.blue_pin_number)
+        self.blue_pin.value(0)
+        self.blue = PWM(self.blue_pin)
+        self.blue.freq(1000)
+
+        self.red_pin = Pin(self.red_pin_number)
+        self.red_pin.value(0)
+        self.red = PWM(self.red_pin)
+        self.red.freq(1000)
+
+        self.green_pin = Pin(self.green_pin_number)
+        self.green_pin.value(0)
+        self.green = PWM(self.green_pin)
+        self.green.freq(1000)
+
+        self.lit = 1
+        if self.timer:
+            self.timer.deinit()
+        self.timer = Timer(-1)
+        self.timer.init(period=1000, mode=Timer.PERIODIC, callback=self.ap_mode_cycle)
+
 
     def disco_start(self):
         self.blue_pin = Pin(self.blue_pin_number)
@@ -167,6 +221,8 @@ class StatusLed:
         self.green.freq(1000)
 
         self.lit = 1
+        if self.timer:
+            self.timer.deinit()
         self.timer = Timer(-1)
         self.timer.init(period=1000, mode=Timer.PERIODIC, callback=self.random_colour)
 
@@ -182,6 +238,45 @@ class StatusLed:
 
     def value(self):
         return self.lit
+
+
+class WifiResetButton:
+    def __init__(self, power_pin: int, signal_pin: int, status_led: StatusLed):
+        self.wifi_reset_button_power_pin = Pin(power_pin, Pin.OUT)
+        self.wifi_reset_button_power_pin.value(1)
+        self.wifi_reset_button_signal_pin = Pin(signal_pin, Pin.IN, Pin.PULL_DOWN)
+        self.debounced: bool = False
+        self.pressed: bool = False
+        self.DEBOUNCE_TIME = 70
+        self.debounce_timer = Timer()
+        self.wifi_reset_button_signal_pin.irq(trigger=Pin.IRQ_RISING | Pin.IRQ_FALLING, handler=lambda pin: self._handle_button_press() if pin.value() == 1 else self._handle_button_release())
+        self.rising_time_ms = 0
+        self.status_led = status_led
+
+    def _reset_debounce(self):
+        self.debounced = False
+
+    def _handle_button_press(self):
+        global led
+        if not self.debounced and not self.pressed:
+            self.debounced = True
+            led.value(1)
+            self.pressed = True
+            self.rising_time_ms = time.ticks_ms()
+            self.debounce_timer.init(mode=Timer.ONE_SHOT, period=self.DEBOUNCE_TIME, callback=self._reset_debounce())
+
+    def _handle_button_release(self):
+        global led
+        if not self.debounced and self.pressed:
+            self.debounced = True
+            led.value(0)
+            self.pressed = False
+            elapsed_time_ms = time.ticks_diff(time.ticks_ms(), self.rising_time_ms)
+            if elapsed_time_ms > 3000:
+                self.status_led.signal_wifi_reset()
+                delete_wifi_config()
+                reset()
+            self.debounce_timer.init(mode=Timer.ONE_SHOT, period=self.DEBOUNCE_TIME, callback=self._reset_debounce())
 
 
 class SensorMonitor:  # Has MoistureSensor and SensorHistory, periodicaly reads data from MoistureSensor and stores it in SensorHistory
@@ -787,8 +882,11 @@ def handle_request(conn):
             values = []
             times = []
             for elem in sensor_data:
-                values.append(elem[0])
-                times.append(elem[1])
+                try:
+                    values.append(elem[0])
+                    times.append(elem[1])
+                except:
+                    pass
             data = {
                 # "labels": labels,
                 # "values": sensor_monitor.get_data(),
@@ -813,13 +911,37 @@ def handle_request(conn):
     conn.close()
 
 
+def handle_request_ap_mode(conn):
+    global status_led
+    request = conn.recv(1024)
+    request = str(request)
+    if "POST /setup_wifi" in request:
+        ssid_match = ure.search(r"ssid=([^&]*)", request)
+        password_match = ure.search(r"password=([^&]*)", request)
+        if ssid_match and password_match:
+            ssid = ssid_match.group(1)
+            password = password_match.group(1)
+            ssid = ssid.replace("+", " ")
+            password = password.replace("'", "")
+            print("SSID:", ssid)
+            print("Password:", password)
+            save_wifi_config(ssid, password)
+            conn.send("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n")
+            conn.send(json.dumps({"status": "ok"}))
+            status_led.signal_wifi_set()
+            reset()
+    stream_file("ap_index.html", conn, "text/html")
+    conn.close()
+    pass
+
+
 # Main function to start the web server
 s = None
 conn = None
 
 
 def start_web_server():
-    global s, conn, pico_timer
+    global s, conn, pico_timer, network_connection
     if s:
         s.close()
     addr = socket.getaddrinfo("0.0.0.0", 80)[0][-1]
@@ -837,8 +959,14 @@ def start_web_server():
                     break
                 conn, addr = s.accept()
                 conn.settimeout(10.0)
-                print(pico_timer.get_pretty_time(), "Connection from", addr)
-                handle_request(conn)
+                try:
+                    print(pico_timer.get_pretty_time(), "Connection from", addr)
+                except:
+                    print("Connection from", addr)
+                if network_connection.ap_active():
+                    handle_request_ap_mode(conn)
+                else:
+                    handle_request(conn)
                 conn.close()
                 collect()
             except Exception as e:
@@ -1146,10 +1274,13 @@ class Sensors:
 
 status_led = StatusLed()
 
+WifiResetButton(power_pin=5, signal_pin=3, status_led=status_led)
+
 network_connection = NetworkConnection()
 
 while True:
     if network_connection.ap_active():
+        status_led.ap_mode_start()
         start_web_server()
         break
 
