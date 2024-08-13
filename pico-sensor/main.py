@@ -40,7 +40,7 @@ frequency_MHz = 125
 freq(frequency_MHz * 1000000)
 print("Current frequency: ", freq() / 1000000, "MHz")
 HISTORY_LENGTH = 72
-SAMPLING_FREQUENCY_SECONDS = 600
+SAMPLING_FREQUENCY_SECONDS = 60
 hostname = f"pico-plant-monitor"
 network.hostname(hostname)
 WIFI_CONFIG_FILE = "wifi_config.json"
@@ -244,6 +244,9 @@ class Sensor:
     def __init__(self) -> None:
         pass
 
+    def data_interface(self) -> float:
+        return 0.0
+
 
 class WifiResetButton(Sensor):
     def __init__(self, power_pin: int, signal_pin: int, status_led: StatusLed) -> None:
@@ -365,6 +368,73 @@ class CustomTimer:
             raise e
 
 
+class AHT10:
+    def __init__(self, i2c_address: str, i2c_bus: int, i2c_sda_pin: int, i2c_scl_pin: int, power_pin: int) -> None:
+        self.i2c_address = i2c_address
+        self.i2c_bus = i2c_bus
+        self.i2c_sda_pin = i2c_sda_pin
+        self.i2c_scl_pin = i2c_scl_pin
+        self.power_pin = Pin(power_pin, Pin.OUT)
+        self._power_on()
+        self._power_off()
+        print(self.get_temperature_and_humidity())
+    
+    def _power_off(self) -> None:
+        self.power_pin.value(0)
+        print("aht10 power off")
+    
+    def _power_on(self) -> None:
+        self.power_pin.value(1)
+        time.sleep(0.1)
+        self.i2c = I2C(self.i2c_bus, scl=Pin(self.i2c_scl_pin), sda=Pin(self.i2c_sda_pin), freq=100000)
+        self._init_sensor()
+        print("aht10 power on")
+
+    def _init_sensor(self) -> None:
+        for i in range(10):
+            try:
+                print(f"self.i2c_address: {self.i2c_address}")
+                self.i2c.writeto(int(self.i2c_address), b"\xE1\x08\x00")
+                break
+            except OSError as e:
+                if i < 9:
+                    time.sleep(0.1)
+                    continue
+                raise e
+
+    def _read_data(self) -> bytes:
+        self._power_on()
+
+        for i in range(10):
+            try:
+                self.i2c.writeto(int(self.i2c_address), b"\xAC\x33\x00")
+                time.sleep(0.05)
+                data: bytes = self.i2c.readfrom(int(self.i2c_address), 6)
+                self._power_off()
+                return data
+            except OSError as e:
+                if i < 9:
+                    continue
+                raise e
+        raise Exception("failed to read AHT10")
+
+    def get_temperature_and_humidity(self) -> Tuple[float, float]:
+        data: bytes = self._read_data()
+        raw_humidity: int = ((data[1] << 16) | (data[2] << 8) | data[3]) >> 4
+        raw_temperature: int = ((data[3] & 0x0F) << 16) | (data[4] << 8) | data[5]
+        humidity: float = (raw_humidity * 100) / 0x100000
+        temperature: float = ((raw_temperature * 200) / 0x100000) - 52
+        return temperature, humidity
+
+    def get_temperature(self) -> float:
+        temperature, _ = self.get_temperature_and_humidity()
+        return temperature
+
+    def get_humidity(self) -> float:
+        _, humidity = self.get_temperature_and_humidity()
+        return humidity
+
+
 class SensorHistory:
     def __init__(
         self, filename: str, length: int, custom_timer: CustomTimer, sensor_type: str
@@ -388,7 +458,7 @@ class SensorHistory:
             self.history.pop(0)
         return self.history
 
-    def get(self):
+    def get(self) -> list[Tuple[float, int]]:
         return self.history
 
 
@@ -404,46 +474,43 @@ class SensorMonitor:
             callback=self._record_data,
         )
 
-    def _record_data(self, timer=None) -> None:
+    def _record_data(self, timer: Timer=None) -> None:
         self.history.add(self.sensor.data_interface())
 
     def get_latest(self) -> Tuple[Any, int]:
         return self.history.get()[-1]
 
-    def get_sensor(self):
+    def get_sensor(self) -> Sensor:
         return self.sensor
 
     def get_data(self) -> list[Tuple[Any, int]]:
         return self.history.get()
 
-    def toDict(self) -> dict:
-        return {}
-
 
 class StorageSensor(Sensor):
-    def data_interface(self):
+    def data_interface(self) -> int:
         return self.used_kilobytes()
 
-    def used_kilobytes(self):
+    def used_kilobytes(self) -> int:
         used_size, _ = get_flash_memory_usage()
-        return used_size / 1000
+        return int(used_size / 1000)
 
-    def total_kilobytes(self):
+    def total_kilobytes(self) -> int:
         _, total_size = get_flash_memory_usage()
-        return total_size / 1000
+        return int(total_size / 1000)
 
 
 class MemorySensor(Sensor):
-    def data_interface(self):
-        return self.used_memory() / 1000  # convert to kilobytes
+    def data_interface(self) -> int:
+        return int(self.used_memory() / 1000)  # convert to kilobytes
 
-    def used_memory(self):
+    def used_memory(self) -> int:
         used_memory = mem_alloc()
-        return used_memory
+        return int(used_memory)
 
-    def free_memory(self):
+    def free_memory(self) -> int:
         free_memory = mem_free()
-        return free_memory
+        return int(free_memory)
 
 
 class MoistureSensor(Sensor):
@@ -464,18 +531,18 @@ class MoistureSensor(Sensor):
         self.name = name
         self.uuid = uuid
 
-    def data_interface(self):
-        return self.percentage()
+    def data_interface(self) -> float:
+        return float(self.percentage())
 
-    def voltage(self):
+    def voltage(self) -> float:
         self.adc_power_pin.value(1)
         sleep(0.01)
         adc_value = self.adc.read_u16()
         self.adc_power_pin.value(0)
-        voltage = adc_value * 3.3 / 65535
+        voltage = float(adc_value * 3.3 / 65535)
         return voltage
 
-    def percentage(self):
+    def percentage(self) -> float:
         voltage = self.voltage()
         percentage = round(
             (
@@ -490,107 +557,51 @@ class MoistureSensor(Sensor):
         return percentage
 
 
-class PicoTemperatureSensor:
+class PicoTemperatureSensor(Sensor):
     conversion_factor = 3.3 / (65535)
     temperature_sensor = ADC(4)
 
-    def data_interface(self):
+    def data_interface(self) -> float:
         return self.read_temperature()
 
-    def read_temperature(self):
+    def read_temperature(self) -> float:
         raw_value = self.temperature_sensor.read_u16()
         voltage = raw_value * self.conversion_factor
-        temperature_c = 27 - (voltage - 0.706) / 0.001721
+        temperature_c = float(27 - (voltage - 0.706) / 0.001721)
         return temperature_c
 
 
-class AHT10TemperatureSensor:
-    def __init__(self, aht10):
+class AHT10TemperatureSensor(Sensor):
+    def __init__(self, aht10: AHT10) -> None:
         self.aht10 = aht10
 
-    def data_interface(self):
+    def data_interface(self) -> float:
         return self.read_temperature()
 
-    def read_temperature(self):
+    def read_temperature(self) -> float:
         return self.aht10.get_temperature()
 
 
 class AHT10HumiditySensor:
-    def __init__(self, aht10):
+    def __init__(self, aht10: AHT10):
         self.aht10 = aht10
 
-    def data_interface(self):
-        return self.read_temperature()
+    def data_interface(self) -> float:
+        return self.read_humidity()
 
-    def read_temperature(self):
+    def read_humidity(self) -> float:
         return self.aht10.get_humidity()
 
 
-class AHT10:
-    def __init__(self, i2c_address, i2c_bus, i2c_sda_pin, i2c_scl_pin, power_pin):
-        self.i2c_address = i2c_address
-        self.power_pin = Pin(power_pin, Pin.OUT)
-        self.power_pin.value(1)  # power on AHT10
-        time.sleep(0.1)  # waith for AHT10 power up
-        self.i2c = I2C(i2c_bus, scl=Pin(i2c_scl_pin), sda=Pin(i2c_sda_pin), freq=100000)
-        self.init_sensor()
-
-    def init_sensor(self):
-        for i in range(10):
-            try:
-                print(f"self.i2c_address: {self.i2c_address}")
-                self.i2c.writeto(int(self.i2c_address), b"\xE1\x08\x00")
-                time.sleep(0.05)
-                break
-            except OSError as e:
-                if i < 9:
-                    continue
-                raise e
-
-    def read_data(self):
-        for i in range(10):
-            try:
-                self.i2c.writeto(int(self.i2c_address), b"\xAC\x33\x00")
-                time.sleep(0.05)
-                data = self.i2c.readfrom(int(self.i2c_address), 6)
-                return data
-            except OSError as e:
-                if i < 9:
-                    continue
-                raise e
-
-    def get_temperature_and_humidity(self):
-        data = self.read_data()
-        humidity = ((data[1] << 16) | (data[2] << 8) | data[3]) >> 4
-        temperature = ((data[3] & 0x0F) << 16) | (data[4] << 8) | data[5]
-
-        humidity = (humidity * 100) / 1048576
-        temperature = ((temperature * 200) / 1048576) - 50
-
-        return temperature, humidity
-
-    def get_temperature(self):
-        data = self.read_data()
-        temperature = ((data[3] & 0x0F) << 16) | (data[4] << 8) | data[5]
-        temperature = ((temperature * 200) / 1048576) - 50
-        return temperature
-
-    def get_humidity(self):
-        data = self.read_data()
-        humidity = ((data[1] << 16) | (data[2] << 8) | data[3]) >> 4
-        humidity = (humidity * 100) / 1048576
-        return humidity
-
-
 class PersistentList:
-    def __init__(self, filename: str, max_lines: int, tail_lines: int = 10):
-        self.filename = filename
-        self.data = []
-        self.max_lines = max_lines
-        self.tail_lines = tail_lines
+    def __init__(self, filename: str, max_lines: int, tail_lines: int = 10) -> None:
+        self.filename: str = filename
+        self.data: list[Tuple[float, int]] = []
+        self.max_lines: int = max_lines
+        self.tail_lines: int = tail_lines
         self._load_from_file()
 
-    def get_content(self) -> list:
+    def get_content(self) -> list[Tuple[float, int]]:
         return self.data
 
     def _load_from_file(self) -> None:
@@ -603,7 +614,7 @@ class PersistentList:
         with open(self.filename, "r") as file:
             for line in file:
                 line_splits = line.split(",")
-                item = line_splits[0]
+                item = float(line_splits[0])
                 event_unix_time: int = int(line_splits[1])
                 self.data.append((item, event_unix_time))
                 if len(self.data) > self.max_lines:
@@ -670,7 +681,7 @@ def print_memory_usage():
     print(f"Free memory: {free_memory} bytes")
 
 
-def get_flash_memory_usage():
+def get_flash_memory_usage() -> Tuple[int, int]:
     statvfs = uos.statvfs("/")
     total_blocks = statvfs[2]
     block_size = statvfs[0]
@@ -692,18 +703,18 @@ def load_config():
         return "undefined-uuid", "undefined given name"
 
 
-def save_config(updated_config: dict):
+def save_config(updated_config: dict) -> None:
     with open(CONFIG_FILE, "w") as f:
         json.dump(updated_config, f)
 
 
-def save_wifi_config(ssid, password):
+def save_wifi_config(ssid, password) -> None:
     wifi_config = {"ssid": ssid, "password": password}
     with open(WIFI_CONFIG_FILE, "w") as f:
         json.dump(wifi_config, f)
 
 
-def load_wifi_config():
+def load_wifi_config() -> Tuple[Optional[str], Optional[str]]:
     try:
         with open(WIFI_CONFIG_FILE, "r") as f:
             wifi_config = json.load(f)
