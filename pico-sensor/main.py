@@ -14,23 +14,23 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-import network
+import network  # type: ignore
 import socket
-import ure
+import ure  # type: ignore
 import struct
 import time
-import utime
+import utime  # type: ignore
 from time import sleep
 import os
 from os import remove, rename
 import ssl
 import json
-from machine import Pin, ADC, Timer, I2C, freq, reset, PWM
-from gc import collect, mem_alloc, mem_free
-import uos
-import ubinascii
+from machine import Pin, ADC, Timer, I2C, freq, reset, PWM  # type: ignore
+from gc import collect, mem_alloc, mem_free  # type: ignore
+import uos  # type: ignore
+import ubinascii  # type: ignore
 import sys
-from typing import Any, Tuple
+from typing import Any, Tuple, Optional, Union
 import random
 
 # periodic_restart_timer = Timer()
@@ -39,8 +39,7 @@ import random
 frequency_MHz = 125
 freq(frequency_MHz * 1000000)
 print("Current frequency: ", freq() / 1000000, "MHz")
-# AHT10_I2C_ADDRESS = 0x38
-HISTORY_LENGTH = 144
+HISTORY_LENGTH = 72
 SAMPLING_FREQUENCY_SECONDS = 600
 hostname = f"pico-plant-monitor"
 network.hostname(hostname)
@@ -50,7 +49,7 @@ led = Pin("LED", Pin.OUT)
 led.value(0)
 
 
-def generate_uuid():
+def generate_uuid() -> str:
     random_bytes = uos.urandom(16)
     uuid = ubinascii.hexlify(random_bytes).decode()
     return f"{uuid[:8]}-{uuid[8:12]}-{uuid[12:16]}-{uuid[16:20]}-{uuid[20:]}"
@@ -65,23 +64,22 @@ class CloudUpdater:
     current_version: int = 0
     updates_available: bool = False
 
-    def __init__(self):
-        self.updates_available = self.check_for_updates()
+    def __init__(self) -> None:
+        self.check_for_updates()
 
-    def check_for_updates(self):
+    def check_for_updates(self) -> None:
         print("checking for updates..")
         self.version_config = self._load_file("version.json")
-        self.current_version = self.version_config["version"]
+        self.current_version = int(self.version_config["version"])
         self._download_file("version.json", "remote-version.json")
         self.remote_version_config = self._load_file("remote-version.json")
         self.remote_version = self.remote_version_config["version"]
         self.updates_available = self.remote_version > self.current_version
-        return self.updates_available
 
-    def pretty_current_version(self):
+    def pretty_current_version(self) -> str:
         return f"v.{self.current_version}"
 
-    def update(self, timer=None):
+    def update(self, timer: Timer=None) -> None:
         print("updating..")
         global update_mutex
         update_mutex = True
@@ -92,7 +90,8 @@ class CloudUpdater:
             self._download_file(file, file)
         self._install_update()
 
-    def _download_file(self, remote_file_name, local_file_name):
+    def _download_file(self, remote_file_name: str, local_file_name: str) -> None:
+        collect()
         https_file_url = f"{self.base_url}{remote_file_name}"
         print(f"Downloading file.. {https_file_url}")
         _, _, host, path = https_file_url.split("/", 3)
@@ -101,30 +100,30 @@ class CloudUpdater:
         addr = socket.getaddrinfo(host, 443)[0][-1]
         s = socket.socket()
         s.connect(addr)
-        s = ssl.wrap_socket(s, server_hostname=host)
+        s = ssl.wrap_socket(s, server_hostname=host)  # type: ignore
         request = "GET {} HTTP/1.1\r\nHost: {}\r\nConnection: close\r\n\r\n".format(
             path, host
         )
-        s.write(request.encode("utf-8"))
+        s.write(request.encode("utf-8"))  # type: ignore
         response = b""
         while b"\r\n\r\n" not in response:
-            response += s.read(1)
+            response += s.read(1)  # type: ignore
         _, body = response.split(b"\r\n\r\n", 1)
         with open(local_file_name, "wb") as file:
             file.write(body)
             while True:
-                data = s.read(1024)
+                data = s.read(1024)  # type: ignore
                 if not data:
                     break
                 file.write(data)
         s.close()
 
-    def _install_update(self):
+    def _install_update(self) -> None:
         print("installing update..")
         sleep(1)
         reset()
 
-    def _load_file(self, filename):
+    def _load_file(self, filename: str) -> Any:
         with open(filename, "r") as f:
             version_config = json.load(f)
             return version_config
@@ -143,7 +142,7 @@ class StatusLed:
         self.disco_stop()
         self.disco_start()
 
-    def random_colour(self, timer=None):
+    def random_colour(self, timer: Timer=None):
         random_red = random.randint(0, int(65536 * self.brightness))
         random_green = random.randint(0, int(65536 * self.brightness))
         random_blue = random.randint(0, int(65536 * self.brightness))
@@ -203,7 +202,6 @@ class StatusLed:
         self.timer = Timer(-1)
         self.timer.init(period=1000, mode=Timer.PERIODIC, callback=self.ap_mode_cycle)
 
-
     def disco_start(self):
         self.blue_pin = Pin(self.blue_pin_number)
         self.blue_pin.value(0)
@@ -249,7 +247,14 @@ class WifiResetButton:
         self.pressed: bool = False
         self.DEBOUNCE_TIME = 70
         self.debounce_timer = Timer()
-        self.wifi_reset_button_signal_pin.irq(trigger=Pin.IRQ_RISING | Pin.IRQ_FALLING, handler=lambda pin: self._handle_button_press() if pin.value() == 1 else self._handle_button_release())
+        self.wifi_reset_button_signal_pin.irq(
+            trigger=Pin.IRQ_RISING | Pin.IRQ_FALLING,
+            handler=lambda pin: (
+                self._handle_button_press()
+                if pin.value() == 1
+                else self._handle_button_release()
+            ),
+        )
         self.rising_time_ms = 0
         self.status_led = status_led
 
@@ -263,7 +268,11 @@ class WifiResetButton:
             led.value(1)
             self.pressed = True
             self.rising_time_ms = time.ticks_ms()
-            self.debounce_timer.init(mode=Timer.ONE_SHOT, period=self.DEBOUNCE_TIME, callback=self._reset_debounce())
+            self.debounce_timer.init(
+                mode=Timer.ONE_SHOT,
+                period=self.DEBOUNCE_TIME,
+                callback=self._reset_debounce(),
+            )
 
     def _handle_button_release(self):
         global led
@@ -276,16 +285,24 @@ class WifiResetButton:
                 self.status_led.signal_wifi_reset()
                 delete_wifi_config()
                 reset()
-            self.debounce_timer.init(mode=Timer.ONE_SHOT, period=self.DEBOUNCE_TIME, callback=self._reset_debounce())
+            self.debounce_timer.init(
+                mode=Timer.ONE_SHOT,
+                period=self.DEBOUNCE_TIME,
+                callback=self._reset_debounce(),
+            )
 
 
-class SensorMonitor:  # Has MoistureSensor and SensorHistory, periodicaly reads data from MoistureSensor and stores it in SensorHistory
+class SensorMonitor:
     def __init__(self, sensor, history) -> None:
         self.sensor = sensor
         self.history: SensorHistory = history
         self.timer: Timer = Timer(-1)
         self._record_data()
-        self.timer.init(period=SAMPLING_FREQUENCY_SECONDS * 1000, mode=Timer.PERIODIC, callback=self._record_data)
+        self.timer.init(
+            period=SAMPLING_FREQUENCY_SECONDS * 1000,
+            mode=Timer.PERIODIC,
+            callback=self._record_data,
+        )
 
     def _record_data(self, timer=None) -> None:
         self.history.add(self.sensor.data_interface())
@@ -592,11 +609,8 @@ class PersistentList:
 
 def buffer_list_with_zeros(input_list, n):
     if len(input_list) < n:
-        # Calculate the number of zeros needed
         num_zeros = n - len(input_list)
-        # Create a list of zeros
         zeros_list = [0] * num_zeros
-        # Prepend the zeros to the input list
         buffered_list = zeros_list + input_list
         return buffered_list
     else:
@@ -609,7 +623,9 @@ class SensorHistory:
     ):
         self.sensor_type = sensor_type
         self.custom_timer = custom_timer
-        self.persistent_history = PersistentList(filename=filename, max_lines=HISTORY_LENGTH)
+        self.persistent_history = PersistentList(
+            filename=filename, max_lines=HISTORY_LENGTH
+        )
         self.history = self.persistent_history.get_content().copy()
         print(f"Loaded {len(self.history)} values from {filename}")
         self.length = length
@@ -689,7 +705,6 @@ def save_wifi_config(ssid, password):
         json.dump(wifi_config, f)
 
 
-# Function to load Wi-Fi configuration from a file
 def load_wifi_config():
     try:
         with open(WIFI_CONFIG_FILE, "r") as f:
@@ -711,7 +726,6 @@ def load_chart(given_id: str):
     pass
 
 
-# Function to stream files
 def stream_file(path, client, content_type):
     try:
         with open(path, "r") as file:
@@ -796,21 +810,6 @@ def handle_request(conn):
     #    stream_file("chart.js", conn, "application/javascript")
     #    conn.close()
     #    return
-
-    elif "POST /setup_wifi" in request:
-        ssid_match = ure.search(r"ssid=([^&]*)", request)
-        password_match = ure.search(r"password=([^&]*)", request)
-        if ssid_match and password_match:
-            ssid = ssid_match.group(1)
-            password = password_match.group(1)
-            ssid = ssid.replace("+", " ")
-            password = password.replace("'", "")
-            print("SSID:", ssid)
-            print("Password:", password)
-            save_wifi_config(ssid, password)
-            conn.send("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n")
-            conn.send(json.dumps({"status": "ok"}))
-            reset()
 
     elif "POST /led" in request:
         # led.toggle()
@@ -923,8 +922,6 @@ def handle_request_ap_mode(conn):
             password = password_match.group(1)
             ssid = ssid.replace("+", " ")
             password = password.replace("'", "")
-            print("SSID:", ssid)
-            print("Password:", password)
             save_wifi_config(ssid, password)
             conn.send("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n")
             conn.send(json.dumps({"status": "ok"}))
@@ -1177,7 +1174,7 @@ class FriendFinder:
 class Sensors:
     sensor_monitors: dict[str, SensorMonitor] = {}
 
-    def get_sensor(self, uuid: str = None, index: int = None):
+    def get_sensor(self, uuid: str = None, index: Optional[int] = None):
         if index is not None:
             print(
                 f"sensor_monitors.items() {list(self.sensor_monitors.keys())[int(index)]}"
@@ -1186,14 +1183,6 @@ class Sensors:
         if uuid:
             return self.sensor_monitors[uuid]
         raise ValueError("uuid or index must be provided")
-
-    def toJSON(self) -> dict:
-        all_sensor_data = {"undefined": 0}  # TODO: implement
-        for uuid, sensor_monitor in self.sensor_monitors:
-            for event, unix_time in sensor_monitor.get_data():
-                pass
-
-        return all_sensor_data
 
     def __init__(self):
         with open("config.json", "r") as f:
@@ -1302,7 +1291,7 @@ memory_sensor_history = SensorHistory(
     "memory.log", HISTORY_LENGTH, pico_timer, sensor_type="memory"
 )
 memory_monitor = SensorMonitor(memory_sensor, memory_sensor_history)
-# cloud_updater = CloudUpdater()
+cloud_updater = CloudUpdater()
 # friend_finder = FriendFinder(network_connection)
 
 
@@ -1310,5 +1299,4 @@ periodic_restart_timer = Timer()
 periodic_restart_timer.init(
     period=86400000, mode=Timer.PERIODIC, callback=periodic_restart
 )
-print(f"storage usage: {get_flash_memory_usage()}")
 start_web_server()
