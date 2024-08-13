@@ -33,14 +33,11 @@ import sys
 from typing import Any, Tuple, Optional, Union
 import random
 
-# periodic_restart_timer = Timer()
-# periodic_restart_timer.init(period=60*60*1000, mode=Timer.PERIODIC, callback=periodic_restart)
-
 frequency_MHz = 125
 freq(frequency_MHz * 1000000)
 print("Current frequency: ", freq() / 1000000, "MHz")
-HISTORY_LENGTH = 72
-SAMPLING_FREQUENCY_SECONDS = 60
+HISTORY_LENGTH = 50
+SAMPLING_FREQUENCY_SECONDS = 600
 hostname = f"pico-plant-monitor"
 network.hostname(hostname)
 WIFI_CONFIG_FILE = "wifi_config.json"
@@ -67,7 +64,7 @@ class CloudUpdater:
     def __init__(self) -> None:
         self.check_for_updates()
 
-    def check_for_updates(self) -> None:
+    def check_for_updates(self) -> bool:
         print("checking for updates..")
         self.version_config = self._load_file("version.json")
         self.current_version = int(self.version_config["version"])
@@ -75,11 +72,12 @@ class CloudUpdater:
         self.remote_version_config = self._load_file("remote-version.json")
         self.remote_version = self.remote_version_config["version"]
         self.updates_available = self.remote_version > self.current_version
+        return self.updates_available
 
     def pretty_current_version(self) -> str:
         return f"v.{self.current_version}"
 
-    def update(self, timer: Timer=None) -> None:
+    def update(self, timer: Timer = None) -> None:
         print("updating..")
         global update_mutex
         update_mutex = True
@@ -92,6 +90,7 @@ class CloudUpdater:
 
     def _download_file(self, remote_file_name: str, local_file_name: str) -> None:
         collect()
+        print(memory_sensor.used_memory())
         https_file_url = f"{self.base_url}{remote_file_name}"
         print(f"Downloading file.. {https_file_url}")
         _, _, host, path = https_file_url.split("/", 3)
@@ -144,7 +143,7 @@ class StatusLed:
         self.disco_stop()
         self.disco_start()
 
-    def _random_colour(self, timer: Timer=None) -> None:
+    def _random_colour(self, timer: Timer = None) -> None:
         random_red = random.randint(0, int(65536 * self.brightness))
         random_green = random.randint(0, int(65536 * self.brightness))
         random_blue = random.randint(0, int(65536 * self.brightness))
@@ -327,9 +326,12 @@ class CustomTimer:
             val = struct.unpack("!I", msg[40:44])[0]
             return val - self.NTP_DELTA, None
         except:
-            return 946684800, "Failed to Update NTP time, defaulting to 1.1.2000"  # Default to Jan 1, 2000
+            return (
+                946684800,
+                "Failed to Update NTP time, defaulting to 1.1.2000",
+            )  # Default to Jan 1, 2000
 
-    def update_time_from_ntp(self, timer: Timer=None) -> None:
+    def update_time_from_ntp(self, timer: Timer = None) -> None:
         try:
             new_unix_time, error = self.get_ntp_time()
             if error:
@@ -369,7 +371,14 @@ class CustomTimer:
 
 
 class AHT10:
-    def __init__(self, i2c_address: str, i2c_bus: int, i2c_sda_pin: int, i2c_scl_pin: int, power_pin: int) -> None:
+    def __init__(
+        self,
+        i2c_address: str,
+        i2c_bus: int,
+        i2c_sda_pin: int,
+        i2c_scl_pin: int,
+        power_pin: int,
+    ) -> None:
         self.i2c_address = i2c_address
         self.i2c_bus = i2c_bus
         self.i2c_sda_pin = i2c_sda_pin
@@ -378,15 +387,20 @@ class AHT10:
         self._power_on()
         self._power_off()
         print(self.get_temperature_and_humidity())
-    
+
     def _power_off(self) -> None:
         self.power_pin.value(0)
         print("aht10 power off")
-    
+
     def _power_on(self) -> None:
         self.power_pin.value(1)
         time.sleep(0.1)
-        self.i2c = I2C(self.i2c_bus, scl=Pin(self.i2c_scl_pin), sda=Pin(self.i2c_sda_pin), freq=100000)
+        self.i2c = I2C(
+            self.i2c_bus,
+            scl=Pin(self.i2c_scl_pin),
+            sda=Pin(self.i2c_sda_pin),
+            freq=100000,
+        )
         self._init_sensor()
         print("aht10 power on")
 
@@ -423,7 +437,7 @@ class AHT10:
         raw_humidity: int = ((data[1] << 16) | (data[2] << 8) | data[3]) >> 4
         raw_temperature: int = ((data[3] & 0x0F) << 16) | (data[4] << 8) | data[5]
         humidity: float = (raw_humidity * 100) / 0x100000
-        temperature: float = ((raw_temperature * 200) / 0x100000) - 52
+        temperature: float = ((raw_temperature * 200) / 0x100000) - 53
         return temperature, humidity
 
     def get_temperature(self) -> float:
@@ -474,7 +488,7 @@ class SensorMonitor:
             callback=self._record_data,
         )
 
-    def _record_data(self, timer: Timer=None) -> None:
+    def _record_data(self, timer: Timer = None) -> None:
         self.history.add(self.sensor.data_interface())
 
     def get_latest(self) -> Tuple[Any, int]:
@@ -582,7 +596,7 @@ class AHT10TemperatureSensor(Sensor):
         return self.aht10.get_temperature()
 
 
-class AHT10HumiditySensor:
+class AHT10HumiditySensor(Sensor):
     def __init__(self, aht10: AHT10):
         self.aht10 = aht10
 
@@ -610,7 +624,9 @@ class PersistentList:
         except:
             self.data = []
 
-    def _read_last_n_lines(self) -> None:  # TODO: read in reverse order to speedup startup time
+    def _read_last_n_lines(
+        self,
+    ) -> None:  # TODO: read in reverse order to speedup startup time
         with open(self.filename, "r") as file:
             for line in file:
                 line_splits = line.split(",")
@@ -620,7 +636,7 @@ class PersistentList:
                 if len(self.data) > self.max_lines:
                     self.data.pop(0)
 
-    def append(self, item, event_unix_time) -> None:
+    def append(self, item: float, event_unix_time: int) -> None:
         self.data.append((item, event_unix_time))
         if len(self.data) > self.max_lines:
             self.data.pop(0)
@@ -634,7 +650,7 @@ class PersistentList:
         with open(temporary_file_name, "wb") as temporary_file:
             print("trimming history:", self.filename)
             for item, event_unix_time in self.data:
-                temporary_file.write(f"{item},{event_unix_time}\n")
+                temporary_file.write(f"{item},{event_unix_time}\n")  # type: ignore
         remove(self.filename)
         rename(temporary_file_name, self.filename)
 
@@ -643,34 +659,34 @@ class PersistentList:
             return sum(1 for _ in file)
 
 
-def buffer_list_with_zeros(input_list, n) -> list:
+def buffer_list_with_zeros(
+    input_list: list[Tuple[float, int]], n: int
+) -> list[Tuple[float, int]]:  # TODO: bug here, does not work yet with timed elements
     if len(input_list) < n:
         num_zeros = n - len(input_list)
         zeros_list = [0] * num_zeros
         buffered_list = zeros_list + input_list
-        return buffered_list
+        return buffered_list  # type: ignore
     else:
         return input_list
 
 
-def get_ntp_time(host="pool.ntp.org"):  # TODO: make more robust
+def get_ntp_time(host: str = "pool.ntp.org") -> int:  # TODO: make more robust
     # Reference time (Jan 1, 1970) in seconds since 1900 (NTP epoch)
     NTP_DELTA = 2208988800
     ntp_query = b"\x1b" + 47 * b"\0"
-
     addr = socket.getaddrinfo(host, 123)[0][-1]
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     s.settimeout(1)
     res = s.sendto(ntp_query, addr)
     msg, addr = s.recvfrom(1024)
     s.close()
-
     val = struct.unpack("!I", msg[40:44])[0]
     print("time:", val - NTP_DELTA)
-    return val - NTP_DELTA
+    return int(val - NTP_DELTA)
 
 
-def print_memory_usage():
+def print_memory_usage() -> None:
     collect()
     total_memory = mem_alloc() + mem_free()
     used_memory = mem_alloc()
@@ -694,21 +710,12 @@ def get_flash_memory_usage() -> Tuple[int, int]:
     return used_size, total_size
 
 
-def load_config():
-    try:
-        with open(CONFIG_FILE, "r") as f:
-            config = json.load(f)
-            return config["uuid"], config["givenName"]
-    except:
-        return "undefined-uuid", "undefined given name"
-
-
-def save_config(updated_config: dict) -> None:
+def save_config(updated_config: dict[str, Any]) -> None:
     with open(CONFIG_FILE, "w") as f:
         json.dump(updated_config, f)
 
 
-def save_wifi_config(ssid, password) -> None:
+def save_wifi_config(ssid: str, password: str) -> None:
     wifi_config = {"ssid": ssid, "password": password}
     with open(WIFI_CONFIG_FILE, "w") as f:
         json.dump(wifi_config, f)
@@ -731,11 +738,7 @@ def delete_wifi_config() -> None:
         print("Error deleting configuration file:", e)
 
 
-def load_chart(given_id: str):
-    pass
-
-
-def stream_file(path, client, content_type) -> None:
+def stream_file(path: str, client: Any, content_type: str) -> None:
     try:
         with open(path, "r") as file:
             client.send(f"HTTP/1.1 200 OK\r\nContent-Type: {content_type}\r\n\r\n")
@@ -748,15 +751,7 @@ def stream_file(path, client, content_type) -> None:
         client.send("HTTP/1.1 404 Not Found\r\n\r\n")
 
 
-def serve_file(path):
-    try:
-        with open(path, "r") as file:
-            return file.read()
-    except:
-        return None
-
-
-def parse_query_params(query_string):
+def parse_query_params(query_string: str) -> dict[str, str]:
     params = {}
     if query_string:
         pairs = query_string.split("&")
@@ -765,15 +760,15 @@ def parse_query_params(query_string):
                 key, value = pair.split("=", 1)
                 params[key] = value
             else:
-                params[pair] = None
+                params[pair] = None  # type: ignore
     return params
 
 
 # Function to handle incoming HTTP requests
-def handle_request(conn):
+def handle_request(conn: Any) -> None:
     global sensors, pico_timer
-    global storage_sensor, storage_monitor
-    global memory_sensor, memory_monitor
+    # global storage_sensor, storage_monitor
+    # global memory_sensor, memory_monitor
     global version
     global cloud_updater
     global friend_finder
@@ -834,11 +829,11 @@ def handle_request(conn):
         conn.close()
         return
 
-    elif "POST /memory" in request:
-        print_memory_usage()
-
     elif "GET /time" in request:
-        return get_ntp_time()
+        conn.send("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n")
+        conn.send(json.dumps({"ntp_time": get_ntp_time()}))
+        conn.close()
+        return
 
     elif "GET /main.js" in request:
         stream_file("main.js", conn, "application/javascript")
@@ -878,13 +873,13 @@ def handle_request(conn):
         if "?sensor_index=" in request.split(" ")[1]:
             query_string = request.split(" ")[1].split("?", 1)[1]
             query_params = parse_query_params(query_string)
-            sensor_index = query_params.get("sensor_index")
+            sensor_index = int(query_params.get("sensor_index", 0))
             sensor_monitor = sensors.get_sensor(index=sensor_index)
             labels = list(range(HISTORY_LENGTH))
             labels.reverse()
             sensor_data = sensor_monitor.get_data()
             try:
-                name = sensor_monitor.sensor.name
+                name = sensor_monitor.sensor.name  # type: ignore
             except:
                 name = sensor_monitor.history.sensor_type
             values = []
@@ -919,7 +914,7 @@ def handle_request(conn):
     conn.close()
 
 
-def handle_request_ap_mode(conn):
+def handle_request_ap_mode(conn: Any) -> None:
     global status_led
     request = conn.recv(1024)
     request = str(request)
@@ -938,7 +933,6 @@ def handle_request_ap_mode(conn):
             reset()
     stream_file("ap_index.html", conn, "text/html")
     conn.close()
-    pass
 
 
 # Main function to start the web server
@@ -946,7 +940,7 @@ s = None
 conn = None
 
 
-def start_web_server():
+def start_web_server() -> None:
     global s, conn, pico_timer, network_connection
     if s:
         s.close()
@@ -977,8 +971,8 @@ def start_web_server():
                 collect()
             except Exception as e:
                 print("while true error:", e)
-                sys.print_exception(e)
-                conn.close()
+                sys.print_exception(e)  # type: ignore
+                conn.close()  # type: ignore
                 if "[Errno 110] ETIMEDOUT" in str(e):
                     continue
                 raise e
@@ -994,7 +988,7 @@ def start_web_server():
 update_mutex = False
 
 
-def periodic_restart(timer=None):
+def periodic_restart(timer: Timer = None) -> None:
     print("periodic restart called")
     global update_mutex
     if update_mutex:
@@ -1007,7 +1001,13 @@ def periodic_restart(timer=None):
     print("periodic restart cancelled, update is running")
 
 
-def http_get(url, timeout=5):
+periodic_restart_timer = Timer()
+periodic_restart_timer.init(
+    period=60 * 60 * 1000, mode=Timer.PERIODIC, callback=periodic_restart
+)
+
+
+def http_get(url: str, timeout: int = 5) -> Any:
     if url.startswith("https://"):
         protocol = "https"
         port = 443
@@ -1025,7 +1025,7 @@ def http_get(url, timeout=5):
     s.settimeout(timeout)
     s.connect(addr_info)
     if protocol == "https":
-        s = ssl.wrap_socket(s, server_hostname=host)
+        s = ssl.wrap_socket(s, server_hostname=host)  # type: ignore
     s.sendall(
         bytes(
             "GET {} HTTP/1.1\r\nHost: {}\r\nConnection: close\r\n\r\n".format(
@@ -1041,8 +1041,8 @@ def http_get(url, timeout=5):
             break
         response += data
     s.close()
-    response = response.decode("utf-8")
-    header, body = response.split("\r\n\r\n", 1)
+    response = response.decode("utf-8")  # type: ignore
+    header, body = response.split("\r\n\r\n", 1)  # type: ignore
     status_code = int(header.split()[1])
     if status_code == 200:
         return json.loads(body)
@@ -1058,7 +1058,7 @@ class NetworkConnection:
     ap_ssid = "iot"
     ap_password = "laiskajaakko"
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.ssid, self.password = load_wifi_config()
         self.timer = Timer()
         self.timer.init(
@@ -1069,13 +1069,13 @@ class NetworkConnection:
         else:
             self.start_ap()
 
-    def ap_active(self):
-        return self.ap and self.ap.active()
+    def ap_active(self) -> bool:
+        return bool(self.ap and self.ap.active())
 
-    def wlan_active(self):
-        return self.wlan and self.wlan.isconnected()
+    def wlan_active(self) -> bool:
+        return bool(self.wlan and self.wlan.isconnected())
 
-    def start_ap(self):
+    def start_ap(self) -> None:
         if self.wlan:
             self.wlan.active(False)
             for _ in range(10):
@@ -1091,7 +1091,7 @@ class NetworkConnection:
             sleep(1)
         print(f"Access point active: {self.ap.ifconfig()}")
 
-    def connect_to_wifi(self):
+    def connect_to_wifi(self) -> None:
         if self.ap:
             self.ap.active(False)
         self.wlan = network.WLAN(network.STA_IF)
@@ -1105,18 +1105,18 @@ class NetworkConnection:
             sleep(1)
         print(f"Failed to connect to: {self.ssid}")
 
-    def check_connectivity(self, timer=None):
+    def check_connectivity(self, timer: Timer = None) -> None:
         if self.wlan and not self.wlan.isconnected():
             print("connection lost, reconnecting to wifi..")
             self.connect_to_wifi()
         elif self.ap:
             print(f"ap ok: {self.ap.ifconfig()}")
         else:
-            print(f"wifi ok: {self.wlan.ifconfig()}")
+            print(f"wifi ok: {self.wlan.ifconfig()}")  # type: ignore
 
 
 class FriendFinder:
-    friends = {}
+    friends: dict[str, str] = {}
     next_host_id = 14
     my_ip = ""
     gateway = ""
@@ -1128,20 +1128,20 @@ class FriendFinder:
         except:
             self.friends = {}
         self.network_connection = network_connection
-        self.my_ip = self.network_connection.wlan.ifconfig()[0]
-        self.gateway = self.network_connection.wlan.ifconfig()[2]
+        self.my_ip = self.network_connection.wlan.ifconfig()[0]  # type: ignore
+        self.gateway = self.network_connection.wlan.ifconfig()[2]  # type: ignore
         self.timer = Timer()
         self.timer.init(
             period=10000, mode=Timer.PERIODIC, callback=self.find_friends
         )  # every 10 seconds
 
-    def get_friends(self):
+    def get_friends(self) -> str:
         friend_string = ""
         for friend_ip, status in self.friends.items():
             friend_string += f'<a href="{friend_ip}">{friend_ip}</a>: {status}\n'
         return friend_string
 
-    def get_friends_with_health_check(self):
+    def get_friends_with_health_check(self) -> dict[str, str]:
         for friend_ip in self.friends:
             url = f"http://{friend_ip}/health"
             try:
@@ -1154,7 +1154,7 @@ class FriendFinder:
             self.friends[friend_ip] = "error"
         return self.friends
 
-    def find_friends(self, timer=None):
+    def find_friends(self, timer: Timer = None) -> None:
         if not self.network_connection.wlan_active():
             print("wifi not active, skipping friend finder")
             return
@@ -1183,7 +1183,9 @@ class FriendFinder:
 class Sensors:
     sensor_monitors: dict[str, SensorMonitor] = {}
 
-    def get_sensor(self, uuid: str = None, index: Optional[int] = None):
+    def get_sensor(
+        self, uuid: Optional[str] = None, index: Optional[int] = None
+    ) -> SensorMonitor:
         if index is not None:
             print(
                 f"sensor_monitors.items() {list(self.sensor_monitors.keys())[int(index)]}"
@@ -1193,7 +1195,7 @@ class Sensors:
             return self.sensor_monitors[uuid]
         raise ValueError("uuid or index must be provided")
 
-    def __init__(self):
+    def __init__(self) -> None:
         with open("config.json", "r") as f:
             config = json.load(f)
         for configured_sensor in config.get("sensors"):
@@ -1289,18 +1291,18 @@ while True:
 
 pico_timer = CustomTimer()
 sensors = Sensors()
-storage_sensor = StorageSensor()
-storage_sensor_history = SensorHistory(
-    "storage.log", HISTORY_LENGTH, pico_timer, sensor_type="storage"
-)
-storage_monitor = SensorMonitor(storage_sensor, storage_sensor_history)
+# storage_sensor = StorageSensor()
+# storage_sensor_history = SensorHistory(
+#    "storage.log", HISTORY_LENGTH, pico_timer, sensor_type="storage"
+# )
+# storage_monitor = SensorMonitor(storage_sensor, storage_sensor_history)
 
 memory_sensor = MemorySensor()
-memory_sensor_history = SensorHistory(
-    "memory.log", HISTORY_LENGTH, pico_timer, sensor_type="memory"
-)
-memory_monitor = SensorMonitor(memory_sensor, memory_sensor_history)
-# cloud_updater = CloudUpdater()
+# memory_sensor_history = SensorHistory(
+#    "memory.log", HISTORY_LENGTH, pico_timer, sensor_type="memory"
+# )
+# memory_monitor = SensorMonitor(memory_sensor, memory_sensor_history)
+cloud_updater = CloudUpdater()
 # friend_finder = FriendFinder(network_connection)
 
 
