@@ -14,33 +14,29 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-import network
+import network  # type: ignore
 import socket
-import ure
+import ure  # type: ignore
 import struct
 import time
-import utime
+import utime  # type: ignore
 from time import sleep
 import os
 from os import remove, rename
 import ssl
 import json
-from machine import Pin, ADC, Timer, I2C, freq, reset, PWM
-from gc import collect, mem_alloc, mem_free
-import uos
-import ubinascii
+from machine import Pin, ADC, Timer, I2C, freq, reset, PWM  # type: ignore
+from gc import collect, mem_alloc, mem_free  # type: ignore
+import uos  # type: ignore
+import ubinascii  # type: ignore
 import sys
-from typing import Any, Tuple
+from typing import Any, Tuple, Optional, Union
 import random
-
-# periodic_restart_timer = Timer()
-# periodic_restart_timer.init(period=60*60*1000, mode=Timer.PERIODIC, callback=periodic_restart)
 
 frequency_MHz = 125
 freq(frequency_MHz * 1000000)
 print("Current frequency: ", freq() / 1000000, "MHz")
-# AHT10_I2C_ADDRESS = 0x38
-HISTORY_LENGTH = 144
+HISTORY_LENGTH = 50
 SAMPLING_FREQUENCY_SECONDS = 600
 hostname = f"pico-plant-monitor"
 network.hostname(hostname)
@@ -50,7 +46,7 @@ led = Pin("LED", Pin.OUT)
 led.value(0)
 
 
-def generate_uuid():
+def generate_uuid() -> str:
     random_bytes = uos.urandom(16)
     uuid = ubinascii.hexlify(random_bytes).decode()
     return f"{uuid[:8]}-{uuid[8:12]}-{uuid[12:16]}-{uuid[16:20]}-{uuid[20:]}"
@@ -65,23 +61,23 @@ class CloudUpdater:
     current_version: int = 0
     updates_available: bool = False
 
-    def __init__(self):
-        self.updates_available = self.check_for_updates()
+    def __init__(self) -> None:
+        self.check_for_updates()
 
-    def check_for_updates(self):
+    def check_for_updates(self) -> bool:
         print("checking for updates..")
         self.version_config = self._load_file("version.json")
-        self.current_version = self.version_config["version"]
+        self.current_version = int(self.version_config["version"])
         self._download_file("version.json", "remote-version.json")
         self.remote_version_config = self._load_file("remote-version.json")
         self.remote_version = self.remote_version_config["version"]
         self.updates_available = self.remote_version > self.current_version
         return self.updates_available
 
-    def pretty_current_version(self):
+    def pretty_current_version(self) -> str:
         return f"v.{self.current_version}"
 
-    def update(self, timer=None):
+    def update(self, timer: Timer = None) -> None:
         print("updating..")
         global update_mutex
         update_mutex = True
@@ -92,7 +88,9 @@ class CloudUpdater:
             self._download_file(file, file)
         self._install_update()
 
-    def _download_file(self, remote_file_name, local_file_name):
+    def _download_file(self, remote_file_name: str, local_file_name: str) -> None:
+        collect()
+        print(memory_sensor.used_memory())
         https_file_url = f"{self.base_url}{remote_file_name}"
         print(f"Downloading file.. {https_file_url}")
         _, _, host, path = https_file_url.split("/", 3)
@@ -101,36 +99,38 @@ class CloudUpdater:
         addr = socket.getaddrinfo(host, 443)[0][-1]
         s = socket.socket()
         s.connect(addr)
-        s = ssl.wrap_socket(s, server_hostname=host)
+        s = ssl.wrap_socket(s, server_hostname=host)  # type: ignore
         request = "GET {} HTTP/1.1\r\nHost: {}\r\nConnection: close\r\n\r\n".format(
             path, host
         )
-        s.write(request.encode("utf-8"))
+        s.write(request.encode("utf-8"))  # type: ignore
         response = b""
         while b"\r\n\r\n" not in response:
-            response += s.read(1)
+            response += s.read(1)  # type: ignore
         _, body = response.split(b"\r\n\r\n", 1)
         with open(local_file_name, "wb") as file:
             file.write(body)
             while True:
-                data = s.read(1024)
+                data = s.read(1024)  # type: ignore
                 if not data:
                     break
                 file.write(data)
         s.close()
 
-    def _install_update(self):
+    def _install_update(self) -> None:
         print("installing update..")
         sleep(1)
         reset()
 
-    def _load_file(self, filename):
+    def _load_file(self, filename: str) -> Any:
         with open(filename, "r") as f:
             version_config = json.load(f)
             return version_config
 
 
 class StatusLed:
+    lit: bool = False
+
     def __init__(self, brightness: float = 0.01) -> None:
         self.brightness = brightness
         with open("config.json", "r") as f:
@@ -143,7 +143,7 @@ class StatusLed:
         self.disco_stop()
         self.disco_start()
 
-    def random_colour(self, timer=None):
+    def _random_colour(self, timer: Timer = None) -> None:
         random_red = random.randint(0, int(65536 * self.brightness))
         random_green = random.randint(0, int(65536 * self.brightness))
         random_blue = random.randint(0, int(65536 * self.brightness))
@@ -151,7 +151,7 @@ class StatusLed:
         self.green.duty_u16(random_green)
         self.blue.duty_u16(random_blue)
 
-    def signal_wifi_reset(self):
+    def signal_wifi_reset(self) -> None:
         self.disco_stop()
         self.red_pin = Pin(self.red_pin_number)
         for _ in range(10):
@@ -160,7 +160,7 @@ class StatusLed:
             self.red_pin.value(0)
             sleep(0.2)
 
-    def signal_wifi_set(self):
+    def signal_wifi_set(self) -> None:
         self.disco_stop()
         self.green_pin = Pin(self.green_pin_number)
         for _ in range(10):
@@ -169,19 +169,19 @@ class StatusLed:
             self.green_pin.value(0)
             sleep(0.2)
 
-    def ap_mode_cycle(self, timer=None):
+    def _ap_mode_cycle(self, timer: Timer = None) -> None:
         if self.lit:
             self.red.duty_u16(0)
             self.green.duty_u16(0)
             self.blue.duty_u16(0)
-            self.lit = 0
+            self.lit = False
         else:
             self.red.duty_u16(0)
             self.green.duty_u16(0)
             self.blue.duty_u16(1000)
-            self.lit = 1
+            self.lit = True
 
-    def ap_mode_start(self):
+    def ap_mode_start(self) -> None:
         self.blue_pin = Pin(self.blue_pin_number)
         self.blue_pin.value(0)
         self.blue = PWM(self.blue_pin)
@@ -197,14 +197,13 @@ class StatusLed:
         self.green = PWM(self.green_pin)
         self.green.freq(1000)
 
-        self.lit = 1
+        self.lit = True
         if self.timer:
             self.timer.deinit()
         self.timer = Timer(-1)
-        self.timer.init(period=1000, mode=Timer.PERIODIC, callback=self.ap_mode_cycle)
+        self.timer.init(period=1000, mode=Timer.PERIODIC, callback=self._ap_mode_cycle)
 
-
-    def disco_start(self):
+    def disco_start(self) -> None:
         self.blue_pin = Pin(self.blue_pin_number)
         self.blue_pin.value(0)
         self.blue = PWM(self.blue_pin)
@@ -220,14 +219,14 @@ class StatusLed:
         self.green = PWM(self.green_pin)
         self.green.freq(1000)
 
-        self.lit = 1
+        self.lit = True
         if self.timer:
             self.timer.deinit()
         self.timer = Timer(-1)
-        self.timer.init(period=1000, mode=Timer.PERIODIC, callback=self.random_colour)
+        self.timer.init(period=1000, mode=Timer.PERIODIC, callback=self._random_colour)
 
-    def disco_stop(self):
-        self.lit = 0
+    def disco_stop(self) -> None:
+        self.lit = False
         self.timer.deinit()
         self.red_pin = Pin(self.red_pin_number, Pin.OUT)
         self.red_pin.value(0)
@@ -236,12 +235,20 @@ class StatusLed:
         self.blue_pin = Pin(self.blue_pin_number, Pin.OUT)
         self.blue_pin.value(0)
 
-    def value(self):
+    def value(self) -> bool:
         return self.lit
 
 
-class WifiResetButton:
-    def __init__(self, power_pin: int, signal_pin: int, status_led: StatusLed):
+class Sensor:
+    def __init__(self) -> None:
+        pass
+
+    def data_interface(self) -> float:
+        return 0.0
+
+
+class WifiResetButton(Sensor):
+    def __init__(self, power_pin: int, signal_pin: int, status_led: StatusLed) -> None:
         self.wifi_reset_button_power_pin = Pin(power_pin, Pin.OUT)
         self.wifi_reset_button_power_pin.value(1)
         self.wifi_reset_button_signal_pin = Pin(signal_pin, Pin.IN, Pin.PULL_DOWN)
@@ -249,74 +256,65 @@ class WifiResetButton:
         self.pressed: bool = False
         self.DEBOUNCE_TIME = 70
         self.debounce_timer = Timer()
-        self.wifi_reset_button_signal_pin.irq(trigger=Pin.IRQ_RISING | Pin.IRQ_FALLING, handler=lambda pin: self._handle_button_press() if pin.value() == 1 else self._handle_button_release())
+        self.wifi_reset_button_signal_pin.irq(
+            trigger=Pin.IRQ_RISING | Pin.IRQ_FALLING,
+            handler=lambda pin: (
+                self._handle_button_press()
+                if pin.value() == 1
+                else self._handle_button_release()
+            ),
+        )
         self.rising_time_ms = 0
         self.status_led = status_led
 
-    def _reset_debounce(self):
+    def _reset_debounce(self) -> None:
         self.debounced = False
 
-    def _handle_button_press(self):
+    def _handle_button_press(self) -> None:
         global led
         if not self.debounced and not self.pressed:
             self.debounced = True
             led.value(1)
             self.pressed = True
-            self.rising_time_ms = time.ticks_ms()
-            self.debounce_timer.init(mode=Timer.ONE_SHOT, period=self.DEBOUNCE_TIME, callback=self._reset_debounce())
+            self.rising_time_ms = time.ticks_ms()  # type: ignore
+            self.debounce_timer.init(
+                mode=Timer.ONE_SHOT,
+                period=self.DEBOUNCE_TIME,
+                callback=self._reset_debounce(),  # type: ignore
+            )
 
-    def _handle_button_release(self):
+    def _handle_button_release(self) -> None:
         global led
         if not self.debounced and self.pressed:
             self.debounced = True
             led.value(0)
             self.pressed = False
-            elapsed_time_ms = time.ticks_diff(time.ticks_ms(), self.rising_time_ms)
+            elapsed_time_ms = time.ticks_diff(time.ticks_ms(), self.rising_time_ms)  # type: ignore
             if elapsed_time_ms > 3000:
                 self.status_led.signal_wifi_reset()
                 delete_wifi_config()
                 reset()
-            self.debounce_timer.init(mode=Timer.ONE_SHOT, period=self.DEBOUNCE_TIME, callback=self._reset_debounce())
-
-
-class SensorMonitor:  # Has MoistureSensor and SensorHistory, periodicaly reads data from MoistureSensor and stores it in SensorHistory
-    def __init__(self, sensor, history) -> None:
-        self.sensor = sensor
-        self.history: SensorHistory = history
-        self.timer: Timer = Timer(-1)
-        self._record_data()
-        self.timer.init(period=SAMPLING_FREQUENCY_SECONDS * 1000, mode=Timer.PERIODIC, callback=self._record_data)
-
-    def _record_data(self, timer=None) -> None:
-        self.history.add(self.sensor.data_interface())
-
-    def get_latest(self) -> Tuple[Any, int]:
-        return self.history.get()[-1]
-
-    def get_sensor(self):
-        return self.sensor
-
-    def get_data(self) -> list[Tuple[Any, int]]:
-        return self.history.get()
-
-    def toDict(self) -> dict:
-        return {}
+            self.debounce_timer.init(
+                mode=Timer.ONE_SHOT,
+                period=self.DEBOUNCE_TIME,
+                callback=self._reset_debounce(),  # type: ignore
+            )
 
 
 class CustomTimer:
     NTP_DELTA = 2208988800  # Time difference between 1900 and 1970 (in seconds)
     NTP_SERVER = "pool.ntp.org"
 
-    def __init__(self):
-        self.unix_time, _ = self.get_ntp_time()
-        self.start_time = time.ticks_ms()
+    def __init__(self) -> None:
+        self.unix_time, _ = self.get_ntp_time()  # TODO: improve flow, this is ugly
+        self.start_time = time.ticks_ms()  # type: ignore
         self.timer = Timer(-1)
         self.update_time_from_ntp()
         self.timer.init(
             period=3600000, mode=Timer.PERIODIC, callback=self.update_time_from_ntp
         )
 
-    def get_ntp_time(self):
+    def get_ntp_time(self) -> Tuple[int, Optional[str]]:  # time, error
         try:
             ntp_query = b"\x1b" + 47 * b"\0"
             addr = socket.getaddrinfo(self.NTP_SERVER, 123)[0][-1]
@@ -326,17 +324,20 @@ class CustomTimer:
             msg = s.recv(48)
             s.close()
             val = struct.unpack("!I", msg[40:44])[0]
-            return val - self.NTP_DELTA, False
+            return val - self.NTP_DELTA, None
         except:
-            return 946684800, True  # Default to Jan 1, 2000
+            return (
+                946684800,
+                "Failed to Update NTP time, defaulting to 1.1.2000",
+            )  # Default to Jan 1, 2000
 
-    def update_time_from_ntp(self, timer=None):
+    def update_time_from_ntp(self, timer: Timer = None) -> None:
         try:
             new_unix_time, error = self.get_ntp_time()
             if error:
-                print("Failed to update NTP time")
+                print(error)
                 return
-            self.start_time = time.ticks_ms()
+            self.start_time = time.ticks_ms()  # type: ignore
             self.unix_time = new_unix_time
             print("NTP Time Updated:", new_unix_time)
             if new_unix_time < 0:
@@ -348,12 +349,12 @@ class CustomTimer:
             print("Failed to update NTP time:", e)
             self.unix_time = 946684800  # Default to Jan 1, 2000
 
-    def get_current_unix_time(self):
-        elapsed_time = time.ticks_diff(time.ticks_ms(), self.start_time) // 1000
+    def get_current_unix_time(self) -> int:
+        elapsed_time = int(time.ticks_diff(time.ticks_ms(), self.start_time) // 1000)  # type: ignore
         current_unix_time = self.unix_time + elapsed_time
         return current_unix_time
 
-    def get_pretty_time(self):
+    def get_pretty_time(self) -> str:
         try:
             current_unix_time = self.get_current_unix_time()
             adjusted_unix_time = current_unix_time + 3 * 3600
@@ -369,33 +370,164 @@ class CustomTimer:
             raise e
 
 
-class StorageSensor:
-    def data_interface(self):
+class AHT10:
+    def __init__(
+        self,
+        i2c_address: str,
+        i2c_bus: int,
+        i2c_sda_pin: int,
+        i2c_scl_pin: int,
+        power_pin: int,
+    ) -> None:
+        self.i2c_address = i2c_address
+        self.i2c_bus = i2c_bus
+        self.i2c_sda_pin = i2c_sda_pin
+        self.i2c_scl_pin = i2c_scl_pin
+        self.power_pin = Pin(power_pin, Pin.OUT)
+        self._power_on()
+        self._power_off()
+        print(self.get_temperature_and_humidity())
+
+    def _power_off(self) -> None:
+        self.power_pin.value(0)
+        print("aht10 power off")
+
+    def _power_on(self) -> None:
+        self.power_pin.value(1)
+        time.sleep(0.1)
+        self.i2c = I2C(
+            self.i2c_bus,
+            scl=Pin(self.i2c_scl_pin),
+            sda=Pin(self.i2c_sda_pin),
+            freq=100000,
+        )
+        self._init_sensor()
+        print("aht10 power on")
+
+    def _init_sensor(self) -> None:
+        for i in range(10):
+            try:
+                print(f"self.i2c_address: {self.i2c_address}")
+                self.i2c.writeto(int(self.i2c_address), b"\xE1\x08\x00")
+                break
+            except OSError as e:
+                if i < 9:
+                    time.sleep(0.1)
+                    continue
+                raise e
+
+    def _read_data(self) -> bytes:
+        self._power_on()
+
+        for i in range(10):
+            try:
+                self.i2c.writeto(int(self.i2c_address), b"\xAC\x33\x00")
+                time.sleep(0.05)
+                data: bytes = self.i2c.readfrom(int(self.i2c_address), 6)
+                self._power_off()
+                return data
+            except OSError as e:
+                if i < 9:
+                    continue
+                raise e
+        raise Exception("failed to read AHT10")
+
+    def get_temperature_and_humidity(self) -> Tuple[float, float]:
+        data: bytes = self._read_data()
+        raw_humidity: int = ((data[1] << 16) | (data[2] << 8) | data[3]) >> 4
+        raw_temperature: int = ((data[3] & 0x0F) << 16) | (data[4] << 8) | data[5]
+        humidity: float = (raw_humidity * 100) / 0x100000
+        temperature: float = ((raw_temperature * 200) / 0x100000) - 53
+        return temperature, humidity
+
+    def get_temperature(self) -> float:
+        temperature, _ = self.get_temperature_and_humidity()
+        return temperature
+
+    def get_humidity(self) -> float:
+        _, humidity = self.get_temperature_and_humidity()
+        return humidity
+
+
+class SensorHistory:
+    def __init__(
+        self, filename: str, length: int, custom_timer: CustomTimer, sensor_type: str
+    ):
+        self.sensor_type = sensor_type
+        self.custom_timer = custom_timer
+        self.persistent_history = PersistentList(
+            filename=filename, max_lines=HISTORY_LENGTH
+        )
+        self.history = self.persistent_history.get_content().copy()
+        print(f"Loaded {len(self.history)} values from {filename}")
+        self.length = length
+        self.history = buffer_list_with_zeros(self.history, HISTORY_LENGTH)
+
+    def add(self, value: float) -> list[Tuple[float, int]]:
+        event_unix_time = self.custom_timer.get_current_unix_time()
+        self.history.append((value, event_unix_time))
+        self.persistent_history.append(value, event_unix_time)
+        # remove the first element if the history is too long
+        if len(self.history) > self.length:
+            self.history.pop(0)
+        return self.history
+
+    def get(self) -> list[Tuple[float, int]]:
+        return self.history
+
+
+class SensorMonitor:
+    def __init__(self, sensor: Sensor, history: SensorHistory) -> None:
+        self.sensor = sensor
+        self.history: SensorHistory = history
+        self.timer: Timer = Timer(-1)
+        self._record_data()
+        self.timer.init(
+            period=SAMPLING_FREQUENCY_SECONDS * 1000,
+            mode=Timer.PERIODIC,
+            callback=self._record_data,
+        )
+
+    def _record_data(self, timer: Timer = None) -> None:
+        self.history.add(self.sensor.data_interface())
+
+    def get_latest(self) -> Tuple[Any, int]:
+        return self.history.get()[-1]
+
+    def get_sensor(self) -> Sensor:
+        return self.sensor
+
+    def get_data(self) -> list[Tuple[Any, int]]:
+        return self.history.get()
+
+
+class StorageSensor(Sensor):
+    def data_interface(self) -> int:
         return self.used_kilobytes()
 
-    def used_kilobytes(self):
+    def used_kilobytes(self) -> int:
         used_size, _ = get_flash_memory_usage()
-        return used_size / 1000
+        return int(used_size / 1000)
 
-    def total_kilobytes(self):
+    def total_kilobytes(self) -> int:
         _, total_size = get_flash_memory_usage()
-        return total_size / 1000
+        return int(total_size / 1000)
 
 
-class MemorySensor:
-    def data_interface(self):
-        return self.used_memory() / 1000  # convert to kilobytes
+class MemorySensor(Sensor):
+    def data_interface(self) -> int:
+        return int(self.used_memory() / 1000)  # convert to kilobytes
 
-    def used_memory(self):
+    def used_memory(self) -> int:
         used_memory = mem_alloc()
-        return used_memory
+        return int(used_memory)
 
-    def free_memory(self):
+    def free_memory(self) -> int:
         free_memory = mem_free()
-        return free_memory
+        return int(free_memory)
 
 
-class MoistureSensor:
+class MoistureSensor(Sensor):
     def __init__(
         self,
         power_pin: int,
@@ -413,18 +545,18 @@ class MoistureSensor:
         self.name = name
         self.uuid = uuid
 
-    def data_interface(self):
-        return self.percentage()
+    def data_interface(self) -> float:
+        return float(self.percentage())
 
-    def voltage(self):
+    def voltage(self) -> float:
         self.adc_power_pin.value(1)
         sleep(0.01)
         adc_value = self.adc.read_u16()
         self.adc_power_pin.value(0)
-        voltage = adc_value * 3.3 / 65535
+        voltage = float(adc_value * 3.3 / 65535)
         return voltage
 
-    def percentage(self):
+    def percentage(self) -> float:
         voltage = self.voltage()
         percentage = round(
             (
@@ -439,126 +571,72 @@ class MoistureSensor:
         return percentage
 
 
-class PicoTemperatureSensor:
+class PicoTemperatureSensor(Sensor):
     conversion_factor = 3.3 / (65535)
     temperature_sensor = ADC(4)
 
-    def data_interface(self):
+    def data_interface(self) -> float:
         return self.read_temperature()
 
-    def read_temperature(self):
+    def read_temperature(self) -> float:
         raw_value = self.temperature_sensor.read_u16()
         voltage = raw_value * self.conversion_factor
-        temperature_c = 27 - (voltage - 0.706) / 0.001721
+        temperature_c = float(27 - (voltage - 0.706) / 0.001721)
         return temperature_c
 
 
-class AHT10TemperatureSensor:
-    def __init__(self, aht10):
+class AHT10TemperatureSensor(Sensor):
+    def __init__(self, aht10: AHT10) -> None:
         self.aht10 = aht10
 
-    def data_interface(self):
+    def data_interface(self) -> float:
         return self.read_temperature()
 
-    def read_temperature(self):
+    def read_temperature(self) -> float:
         return self.aht10.get_temperature()
 
 
-class AHT10HumiditySensor:
-    def __init__(self, aht10):
+class AHT10HumiditySensor(Sensor):
+    def __init__(self, aht10: AHT10):
         self.aht10 = aht10
 
-    def data_interface(self):
-        return self.read_temperature()
+    def data_interface(self) -> float:
+        return self.read_humidity()
 
-    def read_temperature(self):
+    def read_humidity(self) -> float:
         return self.aht10.get_humidity()
 
 
-class AHT10:
-    def __init__(self, i2c_address, i2c_bus, i2c_sda_pin, i2c_scl_pin, power_pin):
-        self.i2c_address = i2c_address
-        self.power_pin = Pin(power_pin, Pin.OUT)
-        self.power_pin.value(1)  # power on AHT10
-        time.sleep(0.1)  # waith for AHT10 power up
-        self.i2c = I2C(i2c_bus, scl=Pin(i2c_scl_pin), sda=Pin(i2c_sda_pin), freq=100000)
-        self.init_sensor()
-
-    def init_sensor(self):
-        for i in range(10):
-            try:
-                print(f"self.i2c_address: {self.i2c_address}")
-                self.i2c.writeto(int(self.i2c_address), b"\xE1\x08\x00")
-                time.sleep(0.05)
-                break
-            except OSError as e:
-                if i < 9:
-                    continue
-                raise e
-
-    def read_data(self):
-        for i in range(10):
-            try:
-                self.i2c.writeto(int(self.i2c_address), b"\xAC\x33\x00")
-                time.sleep(0.05)
-                data = self.i2c.readfrom(int(self.i2c_address), 6)
-                return data
-            except OSError as e:
-                if i < 9:
-                    continue
-                raise e
-
-    def get_temperature_and_humidity(self):
-        data = self.read_data()
-        humidity = ((data[1] << 16) | (data[2] << 8) | data[3]) >> 4
-        temperature = ((data[3] & 0x0F) << 16) | (data[4] << 8) | data[5]
-
-        humidity = (humidity * 100) / 1048576
-        temperature = ((temperature * 200) / 1048576) - 50
-
-        return temperature, humidity
-
-    def get_temperature(self):
-        data = self.read_data()
-        temperature = ((data[3] & 0x0F) << 16) | (data[4] << 8) | data[5]
-        temperature = ((temperature * 200) / 1048576) - 50
-        return temperature
-
-    def get_humidity(self):
-        data = self.read_data()
-        humidity = ((data[1] << 16) | (data[2] << 8) | data[3]) >> 4
-        humidity = (humidity * 100) / 1048576
-        return humidity
-
-
 class PersistentList:
-    def __init__(self, filename: str, max_lines: int, tail_lines: int = 10):
-        self.filename = filename
-        self.data = []
-        self.max_lines = max_lines
-        self.tail_lines = tail_lines
+    def __init__(self, filename: str, max_lines: int, tail_lines: int = 10) -> None:
+        self.filename: str = filename
+        self.data: list[Tuple[float, int]] = []
+        self.max_lines: int = max_lines
+        self.tail_lines: int = tail_lines
         self._load_from_file()
 
-    def get_content(self):
+    def get_content(self) -> list[Tuple[float, int]]:
         return self.data
 
-    def _load_from_file(self):
+    def _load_from_file(self) -> None:
         try:
             self._read_last_n_lines()
         except:
             self.data = []
 
-    def _read_last_n_lines(self):  # TODO: read in reverse order to speedup startup time
+    def _read_last_n_lines(
+        self,
+    ) -> None:  # TODO: read in reverse order to speedup startup time
         with open(self.filename, "r") as file:
             for line in file:
                 line_splits = line.split(",")
-                item = line_splits[0]
+                item = float(line_splits[0])
                 event_unix_time: int = int(line_splits[1])
                 self.data.append((item, event_unix_time))
                 if len(self.data) > self.max_lines:
                     self.data.pop(0)
 
-    def append(self, item, event_unix_time):
+    def append(self, item: float, event_unix_time: int) -> None:
         self.data.append((item, event_unix_time))
         if len(self.data) > self.max_lines:
             self.data.pop(0)
@@ -567,85 +645,48 @@ class PersistentList:
         if self._history_file_length() > self.max_lines + self.tail_lines:
             self._trim_history_file()
 
-    def _trim_history_file(self):
+    def _trim_history_file(self) -> None:
         temporary_file_name = f"{self.filename}.tmp"
         with open(temporary_file_name, "wb") as temporary_file:
             print("trimming history:", self.filename)
             for item, event_unix_time in self.data:
-                temporary_file.write(f"{item},{event_unix_time}\n")
+                temporary_file.write(f"{item},{event_unix_time}\n")  # type: ignore
         remove(self.filename)
         rename(temporary_file_name, self.filename)
 
-    def _history_file_length(self):
+    def _history_file_length(self) -> int:
         with open(self.filename, "r") as file:
             return sum(1 for _ in file)
 
-    def __getitem__(self, index):
-        return self.data[index]
 
-    def __len__(self):
-        return len(self.data)
-
-    def __repr__(self):
-        return repr(self.data)
-
-
-def buffer_list_with_zeros(input_list, n):
+def buffer_list_with_zeros(
+    input_list: list[Tuple[float, int]], n: int
+) -> list[Tuple[float, int]]:  # TODO: bug here, does not work yet with timed elements
     if len(input_list) < n:
-        # Calculate the number of zeros needed
         num_zeros = n - len(input_list)
-        # Create a list of zeros
         zeros_list = [0] * num_zeros
-        # Prepend the zeros to the input list
         buffered_list = zeros_list + input_list
-        return buffered_list
+        return buffered_list  # type: ignore
     else:
         return input_list
 
 
-class SensorHistory:
-    def __init__(
-        self, filename: str, length: int, custom_timer: CustomTimer, sensor_type: str
-    ):
-        self.sensor_type = sensor_type
-        self.custom_timer = custom_timer
-        self.persistent_history = PersistentList(filename=filename, max_lines=HISTORY_LENGTH)
-        self.history = self.persistent_history.get_content().copy()
-        print(f"Loaded {len(self.history)} values from {filename}")
-        self.length = length
-        self.history = buffer_list_with_zeros(self.history, HISTORY_LENGTH)
-
-    def add(self, value):
-        event_unix_time = self.custom_timer.get_current_unix_time()
-        self.history.append((value, event_unix_time))
-        self.persistent_history.append(value, event_unix_time)
-        # remove the first element if the history is too long
-        if len(self.history) > self.length:
-            self.history.pop(0)
-        return self.history
-
-    def get(self):
-        return self.history
-
-
-def get_ntp_time(host="pool.ntp.org"):  # TODO: make more robust
+def get_ntp_time(host: str = "pool.ntp.org") -> int:  # TODO: make more robust
     # Reference time (Jan 1, 1970) in seconds since 1900 (NTP epoch)
     NTP_DELTA = 2208988800
     ntp_query = b"\x1b" + 47 * b"\0"
-
     addr = socket.getaddrinfo(host, 123)[0][-1]
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     s.settimeout(1)
     res = s.sendto(ntp_query, addr)
     msg, addr = s.recvfrom(1024)
     s.close()
-
     val = struct.unpack("!I", msg[40:44])[0]
     print("time:", val - NTP_DELTA)
-    return val - NTP_DELTA
+    return int(val - NTP_DELTA)
 
 
-def print_memory_usage():
+def print_memory_usage() -> None:
     collect()
     total_memory = mem_alloc() + mem_free()
     used_memory = mem_alloc()
@@ -656,7 +697,7 @@ def print_memory_usage():
     print(f"Free memory: {free_memory} bytes")
 
 
-def get_flash_memory_usage():
+def get_flash_memory_usage() -> Tuple[int, int]:
     statvfs = uos.statvfs("/")
     total_blocks = statvfs[2]
     block_size = statvfs[0]
@@ -669,28 +710,18 @@ def get_flash_memory_usage():
     return used_size, total_size
 
 
-def load_config():
-    try:
-        with open(CONFIG_FILE, "r") as f:
-            config = json.load(f)
-            return config["uuid"], config["givenName"]
-    except:
-        return "undefined-uuid", "undefined given name"
-
-
-def save_config(updated_config: dict):
+def save_config(updated_config: dict[str, Any]) -> None:
     with open(CONFIG_FILE, "w") as f:
         json.dump(updated_config, f)
 
 
-def save_wifi_config(ssid, password):
+def save_wifi_config(ssid: str, password: str) -> None:
     wifi_config = {"ssid": ssid, "password": password}
     with open(WIFI_CONFIG_FILE, "w") as f:
         json.dump(wifi_config, f)
 
 
-# Function to load Wi-Fi configuration from a file
-def load_wifi_config():
+def load_wifi_config() -> Tuple[Optional[str], Optional[str]]:
     try:
         with open(WIFI_CONFIG_FILE, "r") as f:
             wifi_config = json.load(f)
@@ -699,7 +730,7 @@ def load_wifi_config():
         return None, None
 
 
-def delete_wifi_config():
+def delete_wifi_config() -> None:
     try:
         remove(WIFI_CONFIG_FILE)
         print("Configuration file deleted successfully")
@@ -707,12 +738,7 @@ def delete_wifi_config():
         print("Error deleting configuration file:", e)
 
 
-def load_chart(given_id: str):
-    pass
-
-
-# Function to stream files
-def stream_file(path, client, content_type):
+def stream_file(path: str, client: Any, content_type: str) -> None:
     try:
         with open(path, "r") as file:
             client.send(f"HTTP/1.1 200 OK\r\nContent-Type: {content_type}\r\n\r\n")
@@ -725,15 +751,7 @@ def stream_file(path, client, content_type):
         client.send("HTTP/1.1 404 Not Found\r\n\r\n")
 
 
-def serve_file(path):
-    try:
-        with open(path, "r") as file:
-            return file.read()
-    except:
-        return None
-
-
-def parse_query_params(query_string):
+def parse_query_params(query_string: str) -> dict[str, str]:
     params = {}
     if query_string:
         pairs = query_string.split("&")
@@ -742,15 +760,15 @@ def parse_query_params(query_string):
                 key, value = pair.split("=", 1)
                 params[key] = value
             else:
-                params[pair] = None
+                params[pair] = None  # type: ignore
     return params
 
 
 # Function to handle incoming HTTP requests
-def handle_request(conn):
+def handle_request(conn: Any) -> None:
     global sensors, pico_timer
-    global storage_sensor, storage_monitor
-    global memory_sensor, memory_monitor
+    # global storage_sensor, storage_monitor
+    # global memory_sensor, memory_monitor
     global version
     global cloud_updater
     global friend_finder
@@ -797,21 +815,6 @@ def handle_request(conn):
     #    conn.close()
     #    return
 
-    elif "POST /setup_wifi" in request:
-        ssid_match = ure.search(r"ssid=([^&]*)", request)
-        password_match = ure.search(r"password=([^&]*)", request)
-        if ssid_match and password_match:
-            ssid = ssid_match.group(1)
-            password = password_match.group(1)
-            ssid = ssid.replace("+", " ")
-            password = password.replace("'", "")
-            print("SSID:", ssid)
-            print("Password:", password)
-            save_wifi_config(ssid, password)
-            conn.send("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n")
-            conn.send(json.dumps({"status": "ok"}))
-            reset()
-
     elif "POST /led" in request:
         # led.toggle()
         print(f"status_led: {status_led}")
@@ -826,11 +829,11 @@ def handle_request(conn):
         conn.close()
         return
 
-    elif "POST /memory" in request:
-        print_memory_usage()
-
     elif "GET /time" in request:
-        return get_ntp_time()
+        conn.send("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n")
+        conn.send(json.dumps({"ntp_time": get_ntp_time()}))
+        conn.close()
+        return
 
     elif "GET /main.js" in request:
         stream_file("main.js", conn, "application/javascript")
@@ -870,13 +873,13 @@ def handle_request(conn):
         if "?sensor_index=" in request.split(" ")[1]:
             query_string = request.split(" ")[1].split("?", 1)[1]
             query_params = parse_query_params(query_string)
-            sensor_index = query_params.get("sensor_index")
+            sensor_index = int(query_params.get("sensor_index", 0))
             sensor_monitor = sensors.get_sensor(index=sensor_index)
             labels = list(range(HISTORY_LENGTH))
             labels.reverse()
             sensor_data = sensor_monitor.get_data()
             try:
-                name = sensor_monitor.sensor.name
+                name = sensor_monitor.sensor.name  # type: ignore
             except:
                 name = sensor_monitor.history.sensor_type
             values = []
@@ -911,7 +914,7 @@ def handle_request(conn):
     conn.close()
 
 
-def handle_request_ap_mode(conn):
+def handle_request_ap_mode(conn: Any) -> None:
     global status_led
     request = conn.recv(1024)
     request = str(request)
@@ -923,8 +926,6 @@ def handle_request_ap_mode(conn):
             password = password_match.group(1)
             ssid = ssid.replace("+", " ")
             password = password.replace("'", "")
-            print("SSID:", ssid)
-            print("Password:", password)
             save_wifi_config(ssid, password)
             conn.send("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n")
             conn.send(json.dumps({"status": "ok"}))
@@ -932,7 +933,6 @@ def handle_request_ap_mode(conn):
             reset()
     stream_file("ap_index.html", conn, "text/html")
     conn.close()
-    pass
 
 
 # Main function to start the web server
@@ -940,7 +940,7 @@ s = None
 conn = None
 
 
-def start_web_server():
+def start_web_server() -> None:
     global s, conn, pico_timer, network_connection
     if s:
         s.close()
@@ -971,8 +971,8 @@ def start_web_server():
                 collect()
             except Exception as e:
                 print("while true error:", e)
-                sys.print_exception(e)
-                conn.close()
+                sys.print_exception(e)  # type: ignore
+                conn.close()  # type: ignore
                 if "[Errno 110] ETIMEDOUT" in str(e):
                     continue
                 raise e
@@ -988,7 +988,7 @@ def start_web_server():
 update_mutex = False
 
 
-def periodic_restart(timer=None):
+def periodic_restart(timer: Timer = None) -> None:
     print("periodic restart called")
     global update_mutex
     if update_mutex:
@@ -1001,7 +1001,13 @@ def periodic_restart(timer=None):
     print("periodic restart cancelled, update is running")
 
 
-def http_get(url, timeout=5):
+periodic_restart_timer = Timer()
+periodic_restart_timer.init(
+    period=60 * 60 * 1000, mode=Timer.PERIODIC, callback=periodic_restart
+)
+
+
+def http_get(url: str, timeout: int = 5) -> Any:
     if url.startswith("https://"):
         protocol = "https"
         port = 443
@@ -1019,7 +1025,7 @@ def http_get(url, timeout=5):
     s.settimeout(timeout)
     s.connect(addr_info)
     if protocol == "https":
-        s = ssl.wrap_socket(s, server_hostname=host)
+        s = ssl.wrap_socket(s, server_hostname=host)  # type: ignore
     s.sendall(
         bytes(
             "GET {} HTTP/1.1\r\nHost: {}\r\nConnection: close\r\n\r\n".format(
@@ -1035,8 +1041,8 @@ def http_get(url, timeout=5):
             break
         response += data
     s.close()
-    response = response.decode("utf-8")
-    header, body = response.split("\r\n\r\n", 1)
+    response = response.decode("utf-8")  # type: ignore
+    header, body = response.split("\r\n\r\n", 1)  # type: ignore
     status_code = int(header.split()[1])
     if status_code == 200:
         return json.loads(body)
@@ -1052,7 +1058,7 @@ class NetworkConnection:
     ap_ssid = "iot"
     ap_password = "laiskajaakko"
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.ssid, self.password = load_wifi_config()
         self.timer = Timer()
         self.timer.init(
@@ -1063,13 +1069,13 @@ class NetworkConnection:
         else:
             self.start_ap()
 
-    def ap_active(self):
-        return self.ap and self.ap.active()
+    def ap_active(self) -> bool:
+        return bool(self.ap and self.ap.active())
 
-    def wlan_active(self):
-        return self.wlan and self.wlan.isconnected()
+    def wlan_active(self) -> bool:
+        return bool(self.wlan and self.wlan.isconnected())
 
-    def start_ap(self):
+    def start_ap(self) -> None:
         if self.wlan:
             self.wlan.active(False)
             for _ in range(10):
@@ -1085,7 +1091,7 @@ class NetworkConnection:
             sleep(1)
         print(f"Access point active: {self.ap.ifconfig()}")
 
-    def connect_to_wifi(self):
+    def connect_to_wifi(self) -> None:
         if self.ap:
             self.ap.active(False)
         self.wlan = network.WLAN(network.STA_IF)
@@ -1099,18 +1105,18 @@ class NetworkConnection:
             sleep(1)
         print(f"Failed to connect to: {self.ssid}")
 
-    def check_connectivity(self, timer=None):
+    def check_connectivity(self, timer: Timer = None) -> None:
         if self.wlan and not self.wlan.isconnected():
             print("connection lost, reconnecting to wifi..")
             self.connect_to_wifi()
         elif self.ap:
             print(f"ap ok: {self.ap.ifconfig()}")
         else:
-            print(f"wifi ok: {self.wlan.ifconfig()}")
+            print(f"wifi ok: {self.wlan.ifconfig()}")  # type: ignore
 
 
 class FriendFinder:
-    friends = {}
+    friends: dict[str, str] = {}
     next_host_id = 14
     my_ip = ""
     gateway = ""
@@ -1122,20 +1128,20 @@ class FriendFinder:
         except:
             self.friends = {}
         self.network_connection = network_connection
-        self.my_ip = self.network_connection.wlan.ifconfig()[0]
-        self.gateway = self.network_connection.wlan.ifconfig()[2]
+        self.my_ip = self.network_connection.wlan.ifconfig()[0]  # type: ignore
+        self.gateway = self.network_connection.wlan.ifconfig()[2]  # type: ignore
         self.timer = Timer()
         self.timer.init(
             period=10000, mode=Timer.PERIODIC, callback=self.find_friends
         )  # every 10 seconds
 
-    def get_friends(self):
+    def get_friends(self) -> str:
         friend_string = ""
         for friend_ip, status in self.friends.items():
             friend_string += f'<a href="{friend_ip}">{friend_ip}</a>: {status}\n'
         return friend_string
 
-    def get_friends_with_health_check(self):
+    def get_friends_with_health_check(self) -> dict[str, str]:
         for friend_ip in self.friends:
             url = f"http://{friend_ip}/health"
             try:
@@ -1148,7 +1154,7 @@ class FriendFinder:
             self.friends[friend_ip] = "error"
         return self.friends
 
-    def find_friends(self, timer=None):
+    def find_friends(self, timer: Timer = None) -> None:
         if not self.network_connection.wlan_active():
             print("wifi not active, skipping friend finder")
             return
@@ -1177,7 +1183,9 @@ class FriendFinder:
 class Sensors:
     sensor_monitors: dict[str, SensorMonitor] = {}
 
-    def get_sensor(self, uuid: str = None, index: int = None):
+    def get_sensor(
+        self, uuid: Optional[str] = None, index: Optional[int] = None
+    ) -> SensorMonitor:
         if index is not None:
             print(
                 f"sensor_monitors.items() {list(self.sensor_monitors.keys())[int(index)]}"
@@ -1187,15 +1195,7 @@ class Sensors:
             return self.sensor_monitors[uuid]
         raise ValueError("uuid or index must be provided")
 
-    def toJSON(self) -> dict:
-        all_sensor_data = {"undefined": 0}  # TODO: implement
-        for uuid, sensor_monitor in self.sensor_monitors:
-            for event, unix_time in sensor_monitor.get_data():
-                pass
-
-        return all_sensor_data
-
-    def __init__(self):
+    def __init__(self) -> None:
         with open("config.json", "r") as f:
             config = json.load(f)
         for configured_sensor in config.get("sensors"):
@@ -1291,18 +1291,18 @@ while True:
 
 pico_timer = CustomTimer()
 sensors = Sensors()
-storage_sensor = StorageSensor()
-storage_sensor_history = SensorHistory(
-    "storage.log", HISTORY_LENGTH, pico_timer, sensor_type="storage"
-)
-storage_monitor = SensorMonitor(storage_sensor, storage_sensor_history)
+# storage_sensor = StorageSensor()
+# storage_sensor_history = SensorHistory(
+#    "storage.log", HISTORY_LENGTH, pico_timer, sensor_type="storage"
+# )
+# storage_monitor = SensorMonitor(storage_sensor, storage_sensor_history)
 
 memory_sensor = MemorySensor()
-memory_sensor_history = SensorHistory(
-    "memory.log", HISTORY_LENGTH, pico_timer, sensor_type="memory"
-)
-memory_monitor = SensorMonitor(memory_sensor, memory_sensor_history)
-# cloud_updater = CloudUpdater()
+# memory_sensor_history = SensorHistory(
+#    "memory.log", HISTORY_LENGTH, pico_timer, sensor_type="memory"
+# )
+# memory_monitor = SensorMonitor(memory_sensor, memory_sensor_history)
+cloud_updater = CloudUpdater()
 # friend_finder = FriendFinder(network_connection)
 
 
@@ -1310,5 +1310,4 @@ periodic_restart_timer = Timer()
 periodic_restart_timer.init(
     period=86400000, mode=Timer.PERIODIC, callback=periodic_restart
 )
-print(f"storage usage: {get_flash_memory_usage()}")
 start_web_server()
