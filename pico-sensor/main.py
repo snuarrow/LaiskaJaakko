@@ -130,6 +130,8 @@ class CloudUpdater:
 
 
 class StatusLed:
+    lit: bool = False
+
     def __init__(self, brightness: float = 0.01) -> None:
         self.brightness = brightness
         with open("config.json", "r") as f:
@@ -142,7 +144,7 @@ class StatusLed:
         self.disco_stop()
         self.disco_start()
 
-    def random_colour(self, timer: Timer=None):
+    def _random_colour(self, timer: Timer=None) -> None:
         random_red = random.randint(0, int(65536 * self.brightness))
         random_green = random.randint(0, int(65536 * self.brightness))
         random_blue = random.randint(0, int(65536 * self.brightness))
@@ -150,7 +152,7 @@ class StatusLed:
         self.green.duty_u16(random_green)
         self.blue.duty_u16(random_blue)
 
-    def signal_wifi_reset(self):
+    def signal_wifi_reset(self) -> None:
         self.disco_stop()
         self.red_pin = Pin(self.red_pin_number)
         for _ in range(10):
@@ -159,7 +161,7 @@ class StatusLed:
             self.red_pin.value(0)
             sleep(0.2)
 
-    def signal_wifi_set(self):
+    def signal_wifi_set(self) -> None:
         self.disco_stop()
         self.green_pin = Pin(self.green_pin_number)
         for _ in range(10):
@@ -168,19 +170,19 @@ class StatusLed:
             self.green_pin.value(0)
             sleep(0.2)
 
-    def ap_mode_cycle(self, timer=None):
+    def _ap_mode_cycle(self, timer: Timer = None) -> None:
         if self.lit:
             self.red.duty_u16(0)
             self.green.duty_u16(0)
             self.blue.duty_u16(0)
-            self.lit = 0
+            self.lit = False
         else:
             self.red.duty_u16(0)
             self.green.duty_u16(0)
             self.blue.duty_u16(1000)
-            self.lit = 1
+            self.lit = True
 
-    def ap_mode_start(self):
+    def ap_mode_start(self) -> None:
         self.blue_pin = Pin(self.blue_pin_number)
         self.blue_pin.value(0)
         self.blue = PWM(self.blue_pin)
@@ -196,13 +198,13 @@ class StatusLed:
         self.green = PWM(self.green_pin)
         self.green.freq(1000)
 
-        self.lit = 1
+        self.lit = True
         if self.timer:
             self.timer.deinit()
         self.timer = Timer(-1)
-        self.timer.init(period=1000, mode=Timer.PERIODIC, callback=self.ap_mode_cycle)
+        self.timer.init(period=1000, mode=Timer.PERIODIC, callback=self._ap_mode_cycle)
 
-    def disco_start(self):
+    def disco_start(self) -> None:
         self.blue_pin = Pin(self.blue_pin_number)
         self.blue_pin.value(0)
         self.blue = PWM(self.blue_pin)
@@ -218,14 +220,14 @@ class StatusLed:
         self.green = PWM(self.green_pin)
         self.green.freq(1000)
 
-        self.lit = 1
+        self.lit = True
         if self.timer:
             self.timer.deinit()
         self.timer = Timer(-1)
-        self.timer.init(period=1000, mode=Timer.PERIODIC, callback=self.random_colour)
+        self.timer.init(period=1000, mode=Timer.PERIODIC, callback=self._random_colour)
 
-    def disco_stop(self):
-        self.lit = 0
+    def disco_stop(self) -> None:
+        self.lit = False
         self.timer.deinit()
         self.red_pin = Pin(self.red_pin_number, Pin.OUT)
         self.red_pin.value(0)
@@ -234,12 +236,17 @@ class StatusLed:
         self.blue_pin = Pin(self.blue_pin_number, Pin.OUT)
         self.blue_pin.value(0)
 
-    def value(self):
+    def value(self) -> bool:
         return self.lit
 
 
-class WifiResetButton:
-    def __init__(self, power_pin: int, signal_pin: int, status_led: StatusLed):
+class Sensor:
+    def __init__(self) -> None:
+        pass
+
+
+class WifiResetButton(Sensor):
+    def __init__(self, power_pin: int, signal_pin: int, status_led: StatusLed) -> None:
         self.wifi_reset_button_power_pin = Pin(power_pin, Pin.OUT)
         self.wifi_reset_button_power_pin.value(1)
         self.wifi_reset_button_signal_pin = Pin(signal_pin, Pin.IN, Pin.PULL_DOWN)
@@ -258,29 +265,29 @@ class WifiResetButton:
         self.rising_time_ms = 0
         self.status_led = status_led
 
-    def _reset_debounce(self):
+    def _reset_debounce(self) -> None:
         self.debounced = False
 
-    def _handle_button_press(self):
+    def _handle_button_press(self) -> None:
         global led
         if not self.debounced and not self.pressed:
             self.debounced = True
             led.value(1)
             self.pressed = True
-            self.rising_time_ms = time.ticks_ms()
+            self.rising_time_ms = time.ticks_ms()  # type: ignore
             self.debounce_timer.init(
                 mode=Timer.ONE_SHOT,
                 period=self.DEBOUNCE_TIME,
-                callback=self._reset_debounce(),
+                callback=self._reset_debounce(),  # type: ignore
             )
 
-    def _handle_button_release(self):
+    def _handle_button_release(self) -> None:
         global led
         if not self.debounced and self.pressed:
             self.debounced = True
             led.value(0)
             self.pressed = False
-            elapsed_time_ms = time.ticks_diff(time.ticks_ms(), self.rising_time_ms)
+            elapsed_time_ms = time.ticks_diff(time.ticks_ms(), self.rising_time_ms)  # type: ignore
             if elapsed_time_ms > 3000:
                 self.status_led.signal_wifi_reset()
                 delete_wifi_config()
@@ -288,12 +295,105 @@ class WifiResetButton:
             self.debounce_timer.init(
                 mode=Timer.ONE_SHOT,
                 period=self.DEBOUNCE_TIME,
-                callback=self._reset_debounce(),
+                callback=self._reset_debounce(),  # type: ignore
             )
 
 
+class CustomTimer:
+    NTP_DELTA = 2208988800  # Time difference between 1900 and 1970 (in seconds)
+    NTP_SERVER = "pool.ntp.org"
+
+    def __init__(self) -> None:
+        self.unix_time, _ = self.get_ntp_time()  # TODO: improve flow, this is ugly
+        self.start_time = time.ticks_ms()  # type: ignore
+        self.timer = Timer(-1)
+        self.update_time_from_ntp()
+        self.timer.init(
+            period=3600000, mode=Timer.PERIODIC, callback=self.update_time_from_ntp
+        )
+
+    def get_ntp_time(self) -> Tuple[int, Optional[str]]:  # time, error
+        try:
+            ntp_query = b"\x1b" + 47 * b"\0"
+            addr = socket.getaddrinfo(self.NTP_SERVER, 123)[0][-1]
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.settimeout(1)
+            s.sendto(ntp_query, addr)
+            msg = s.recv(48)
+            s.close()
+            val = struct.unpack("!I", msg[40:44])[0]
+            return val - self.NTP_DELTA, None
+        except:
+            return 946684800, "Failed to Update NTP time, defaulting to 1.1.2000"  # Default to Jan 1, 2000
+
+    def update_time_from_ntp(self, timer: Timer=None) -> None:
+        try:
+            new_unix_time, error = self.get_ntp_time()
+            if error:
+                print(error)
+                return
+            self.start_time = time.ticks_ms()  # type: ignore
+            self.unix_time = new_unix_time
+            print("NTP Time Updated:", new_unix_time)
+            if new_unix_time < 0:
+                print(
+                    "NTP time is negative, defaulting to Jan 1 2000"
+                )  # TODO: this is a temporary fix, find out why NTP time is occasionally negative
+                self.unix_time = 946684800
+        except Exception as e:
+            print("Failed to update NTP time:", e)
+            self.unix_time = 946684800  # Default to Jan 1, 2000
+
+    def get_current_unix_time(self) -> int:
+        elapsed_time = int(time.ticks_diff(time.ticks_ms(), self.start_time) // 1000)  # type: ignore
+        current_unix_time = self.unix_time + elapsed_time
+        return current_unix_time
+
+    def get_pretty_time(self) -> str:
+        try:
+            current_unix_time = self.get_current_unix_time()
+            adjusted_unix_time = current_unix_time + 3 * 3600
+            datetime_tuple = utime.localtime(adjusted_unix_time)
+            pretty_time = "{:04}-{:02}-{:02} {:02}:{:02}:{:02}".format(
+                *datetime_tuple[:6]
+            )
+            return pretty_time
+        except Exception as e:
+            if "OverflowError" in str(e):
+                print("OverflowError: overflow converting long int to machine word")
+                return "2000-01-01 00:00:00"
+            raise e
+
+
+class SensorHistory:
+    def __init__(
+        self, filename: str, length: int, custom_timer: CustomTimer, sensor_type: str
+    ):
+        self.sensor_type = sensor_type
+        self.custom_timer = custom_timer
+        self.persistent_history = PersistentList(
+            filename=filename, max_lines=HISTORY_LENGTH
+        )
+        self.history = self.persistent_history.get_content().copy()
+        print(f"Loaded {len(self.history)} values from {filename}")
+        self.length = length
+        self.history = buffer_list_with_zeros(self.history, HISTORY_LENGTH)
+
+    def add(self, value: float) -> list[Tuple[float, int]]:
+        event_unix_time = self.custom_timer.get_current_unix_time()
+        self.history.append((value, event_unix_time))
+        self.persistent_history.append(value, event_unix_time)
+        # remove the first element if the history is too long
+        if len(self.history) > self.length:
+            self.history.pop(0)
+        return self.history
+
+    def get(self):
+        return self.history
+
+
 class SensorMonitor:
-    def __init__(self, sensor, history) -> None:
+    def __init__(self, sensor: Sensor, history: SensorHistory) -> None:
         self.sensor = sensor
         self.history: SensorHistory = history
         self.timer: Timer = Timer(-1)
@@ -320,73 +420,7 @@ class SensorMonitor:
         return {}
 
 
-class CustomTimer:
-    NTP_DELTA = 2208988800  # Time difference between 1900 and 1970 (in seconds)
-    NTP_SERVER = "pool.ntp.org"
-
-    def __init__(self):
-        self.unix_time, _ = self.get_ntp_time()
-        self.start_time = time.ticks_ms()
-        self.timer = Timer(-1)
-        self.update_time_from_ntp()
-        self.timer.init(
-            period=3600000, mode=Timer.PERIODIC, callback=self.update_time_from_ntp
-        )
-
-    def get_ntp_time(self):
-        try:
-            ntp_query = b"\x1b" + 47 * b"\0"
-            addr = socket.getaddrinfo(self.NTP_SERVER, 123)[0][-1]
-            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            s.settimeout(1)
-            s.sendto(ntp_query, addr)
-            msg = s.recv(48)
-            s.close()
-            val = struct.unpack("!I", msg[40:44])[0]
-            return val - self.NTP_DELTA, False
-        except:
-            return 946684800, True  # Default to Jan 1, 2000
-
-    def update_time_from_ntp(self, timer=None):
-        try:
-            new_unix_time, error = self.get_ntp_time()
-            if error:
-                print("Failed to update NTP time")
-                return
-            self.start_time = time.ticks_ms()
-            self.unix_time = new_unix_time
-            print("NTP Time Updated:", new_unix_time)
-            if new_unix_time < 0:
-                print(
-                    "NTP time is negative, defaulting to Jan 1 2000"
-                )  # TODO: this is a temporary fix, find out why NTP time is occasionally negative
-                self.unix_time = 946684800
-        except Exception as e:
-            print("Failed to update NTP time:", e)
-            self.unix_time = 946684800  # Default to Jan 1, 2000
-
-    def get_current_unix_time(self):
-        elapsed_time = time.ticks_diff(time.ticks_ms(), self.start_time) // 1000
-        current_unix_time = self.unix_time + elapsed_time
-        return current_unix_time
-
-    def get_pretty_time(self):
-        try:
-            current_unix_time = self.get_current_unix_time()
-            adjusted_unix_time = current_unix_time + 3 * 3600
-            datetime_tuple = utime.localtime(adjusted_unix_time)
-            pretty_time = "{:04}-{:02}-{:02} {:02}:{:02}:{:02}".format(
-                *datetime_tuple[:6]
-            )
-            return pretty_time
-        except Exception as e:
-            if "OverflowError" in str(e):
-                print("OverflowError: overflow converting long int to machine word")
-                return "2000-01-01 00:00:00"
-            raise e
-
-
-class StorageSensor:
+class StorageSensor(Sensor):
     def data_interface(self):
         return self.used_kilobytes()
 
@@ -399,7 +433,7 @@ class StorageSensor:
         return total_size / 1000
 
 
-class MemorySensor:
+class MemorySensor(Sensor):
     def data_interface(self):
         return self.used_memory() / 1000  # convert to kilobytes
 
@@ -412,7 +446,7 @@ class MemorySensor:
         return free_memory
 
 
-class MoistureSensor:
+class MoistureSensor(Sensor):
     def __init__(
         self,
         power_pin: int,
@@ -556,16 +590,16 @@ class PersistentList:
         self.tail_lines = tail_lines
         self._load_from_file()
 
-    def get_content(self):
+    def get_content(self) -> list:
         return self.data
 
-    def _load_from_file(self):
+    def _load_from_file(self) -> None:
         try:
             self._read_last_n_lines()
         except:
             self.data = []
 
-    def _read_last_n_lines(self):  # TODO: read in reverse order to speedup startup time
+    def _read_last_n_lines(self) -> None:  # TODO: read in reverse order to speedup startup time
         with open(self.filename, "r") as file:
             for line in file:
                 line_splits = line.split(",")
@@ -575,7 +609,7 @@ class PersistentList:
                 if len(self.data) > self.max_lines:
                     self.data.pop(0)
 
-    def append(self, item, event_unix_time):
+    def append(self, item, event_unix_time) -> None:
         self.data.append((item, event_unix_time))
         if len(self.data) > self.max_lines:
             self.data.pop(0)
@@ -584,7 +618,7 @@ class PersistentList:
         if self._history_file_length() > self.max_lines + self.tail_lines:
             self._trim_history_file()
 
-    def _trim_history_file(self):
+    def _trim_history_file(self) -> None:
         temporary_file_name = f"{self.filename}.tmp"
         with open(temporary_file_name, "wb") as temporary_file:
             print("trimming history:", self.filename)
@@ -593,21 +627,12 @@ class PersistentList:
         remove(self.filename)
         rename(temporary_file_name, self.filename)
 
-    def _history_file_length(self):
+    def _history_file_length(self) -> int:
         with open(self.filename, "r") as file:
             return sum(1 for _ in file)
 
-    def __getitem__(self, index):
-        return self.data[index]
 
-    def __len__(self):
-        return len(self.data)
-
-    def __repr__(self):
-        return repr(self.data)
-
-
-def buffer_list_with_zeros(input_list, n):
+def buffer_list_with_zeros(input_list, n) -> list:
     if len(input_list) < n:
         num_zeros = n - len(input_list)
         zeros_list = [0] * num_zeros
@@ -615,33 +640,6 @@ def buffer_list_with_zeros(input_list, n):
         return buffered_list
     else:
         return input_list
-
-
-class SensorHistory:
-    def __init__(
-        self, filename: str, length: int, custom_timer: CustomTimer, sensor_type: str
-    ):
-        self.sensor_type = sensor_type
-        self.custom_timer = custom_timer
-        self.persistent_history = PersistentList(
-            filename=filename, max_lines=HISTORY_LENGTH
-        )
-        self.history = self.persistent_history.get_content().copy()
-        print(f"Loaded {len(self.history)} values from {filename}")
-        self.length = length
-        self.history = buffer_list_with_zeros(self.history, HISTORY_LENGTH)
-
-    def add(self, value):
-        event_unix_time = self.custom_timer.get_current_unix_time()
-        self.history.append((value, event_unix_time))
-        self.persistent_history.append(value, event_unix_time)
-        # remove the first element if the history is too long
-        if len(self.history) > self.length:
-            self.history.pop(0)
-        return self.history
-
-    def get(self):
-        return self.history
 
 
 def get_ntp_time(host="pool.ntp.org"):  # TODO: make more robust
@@ -714,7 +712,7 @@ def load_wifi_config():
         return None, None
 
 
-def delete_wifi_config():
+def delete_wifi_config() -> None:
     try:
         remove(WIFI_CONFIG_FILE)
         print("Configuration file deleted successfully")
@@ -726,7 +724,7 @@ def load_chart(given_id: str):
     pass
 
 
-def stream_file(path, client, content_type):
+def stream_file(path, client, content_type) -> None:
     try:
         with open(path, "r") as file:
             client.send(f"HTTP/1.1 200 OK\r\nContent-Type: {content_type}\r\n\r\n")
@@ -1291,7 +1289,7 @@ memory_sensor_history = SensorHistory(
     "memory.log", HISTORY_LENGTH, pico_timer, sensor_type="memory"
 )
 memory_monitor = SensorMonitor(memory_sensor, memory_sensor_history)
-cloud_updater = CloudUpdater()
+# cloud_updater = CloudUpdater()
 # friend_finder = FriendFinder(network_connection)
 
 
