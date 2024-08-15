@@ -20,3 +20,9 @@ Requires following hardware (total cost ~9 euros / unit):
 - Analog 3.3v soil moisture sensor
 
 Build guide and printable 3D-models coming soon
+
+
+User Manual (BETA RELEASE):
+- When led is blinking blue, connect to hotspot: SSID: iot, pass: laiskajaakko, then navigate to 192.168.4.1 and set your own wifi credentials
+- Do some IT-wizardy and find out from which ip the sensor is found on your wifi subnet
+- Open the ip with browser and enjoy

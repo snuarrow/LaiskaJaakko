@@ -62,7 +62,7 @@ class CloudUpdater:
     updates_available: bool = False
 
     def __init__(self) -> None:
-        self.check_for_updates()
+        pass
 
     def check_for_updates(self) -> bool:
         print("checking for updates..")
@@ -82,7 +82,7 @@ class CloudUpdater:
         global update_mutex
         update_mutex = True
         sleep(3)
-        self.version_config = self._load_file("version.json")
+        self.version_config = self._load_file("remote-version.json")
         for file in self.version_config["files_included"]:
             print(f"downloading {file}")
             self._download_file(file, file)
