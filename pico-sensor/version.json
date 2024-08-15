@@ -1,10 +1,14 @@
 {
-    "version": 28,
+    "version": 29,
     "files_included": [
         "main.js",
         "main.py",
-        "pico-chart.js",
+        "pico-charts.js",
         "version.json",
-        "typing.py"
+        "typing.py",
+        "index.html",
+        "ap_index.html",
+        "config.example.json",
+        "styles.css"
     ]
 }

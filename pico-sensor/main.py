@@ -54,7 +54,7 @@ def generate_uuid() -> str:
 
 class CloudUpdater:
 
-    branch: str = "main"
+    branch: str = "production"
     base_url: str = (
         f"https://raw.githubusercontent.com/snuarrow/LaiskaJaakko/{branch}/pico-sensor/"
     )
@@ -90,7 +90,6 @@ class CloudUpdater:
 
     def _download_file(self, remote_file_name: str, local_file_name: str) -> None:
         collect()
-        print(memory_sensor.used_memory())
         https_file_url = f"{self.base_url}{remote_file_name}"
         print(f"Downloading file.. {https_file_url}")
         _, _, host, path = https_file_url.split("/", 3)
@@ -120,6 +119,7 @@ class CloudUpdater:
     def _install_update(self) -> None:
         print("installing update..")
         sleep(1)
+        status_led.signal_cloud_update()
         reset()
 
     def _load_file(self, filename: str) -> Any:
@@ -150,6 +150,30 @@ class StatusLed:
         self.red.duty_u16(random_red)
         self.green.duty_u16(random_green)
         self.blue.duty_u16(random_blue)
+
+    def signal_cloud_update(self) -> None:
+        self.disco_stop()
+        self.red_pin = Pin(self.red_pin_number)
+        self.green_pin = Pin(self.green_pin)
+        self.blue_pin = Pin(self.blue_pin)
+        self.blue_pin.value(1)
+        sleep(1)
+        self.green_pin.value(1)
+        sleep(1)
+        self.red_pin.value(1)
+        sleep(2)
+        self.red_pin.value(0)
+        self.green_pin.value(0)
+        self.blue_pin.value(0)
+        sleep(0.5)
+        for i in range(3):
+            self.red_pin.value(1)
+            self.green_pin.value(1)
+            self.blue_pin.value(1)
+            sleep(0.1)
+            self.red_pin.value(0)
+            self.green_pin.value(0)
+            self.blue_pin.value(0)
 
     def signal_wifi_reset(self) -> None:
         self.disco_stop()
@@ -371,81 +395,59 @@ class CustomTimer:
 
 
 class AHT10:
-    def __init__(
-        self,
-        i2c_address: str,
-        i2c_bus: int,
-        i2c_sda_pin: int,
-        i2c_scl_pin: int,
-        power_pin: int,
-    ) -> None:
+    def __init__(self, i2c_address, i2c_bus, i2c_sda_pin, i2c_scl_pin, power_pin):
         self.i2c_address = i2c_address
-        self.i2c_bus = i2c_bus
-        self.i2c_sda_pin = i2c_sda_pin
-        self.i2c_scl_pin = i2c_scl_pin
         self.power_pin = Pin(power_pin, Pin.OUT)
-        self._power_on()
-        self._power_off()
-        print(self.get_temperature_and_humidity())
+        self.power_pin.value(1)  # power on AHT10
+        time.sleep(0.1)  # waith for AHT10 power up
+        self.i2c = I2C(i2c_bus, scl=Pin(i2c_scl_pin), sda=Pin(i2c_sda_pin), freq=100000)
+        self.init_sensor()
 
-    def _power_off(self) -> None:
-        self.power_pin.value(0)
-        print("aht10 power off")
-
-    def _power_on(self) -> None:
-        self.power_pin.value(1)
-        time.sleep(0.1)
-        self.i2c = I2C(
-            self.i2c_bus,
-            scl=Pin(self.i2c_scl_pin),
-            sda=Pin(self.i2c_sda_pin),
-            freq=100000,
-        )
-        self._init_sensor()
-        print("aht10 power on")
-
-    def _init_sensor(self) -> None:
+    def init_sensor(self):
         for i in range(10):
             try:
                 print(f"self.i2c_address: {self.i2c_address}")
                 self.i2c.writeto(int(self.i2c_address), b"\xE1\x08\x00")
+                time.sleep(0.1)
                 break
             except OSError as e:
                 if i < 9:
-                    time.sleep(0.1)
                     continue
                 raise e
 
-    def _read_data(self) -> bytes:
-        self._power_on()
-
+    def read_data(self):
         for i in range(10):
             try:
                 self.i2c.writeto(int(self.i2c_address), b"\xAC\x33\x00")
-                time.sleep(0.05)
-                data: bytes = self.i2c.readfrom(int(self.i2c_address), 6)
-                self._power_off()
+                time.sleep(0.1)
+                data = self.i2c.readfrom(int(self.i2c_address), 6)
+                time.sleep(0.1)
                 return data
             except OSError as e:
                 if i < 9:
                     continue
                 raise e
-        raise Exception("failed to read AHT10")
 
-    def get_temperature_and_humidity(self) -> Tuple[float, float]:
-        data: bytes = self._read_data()
-        raw_humidity: int = ((data[1] << 16) | (data[2] << 8) | data[3]) >> 4
-        raw_temperature: int = ((data[3] & 0x0F) << 16) | (data[4] << 8) | data[5]
-        humidity: float = (raw_humidity * 100) / 0x100000
-        temperature: float = ((raw_temperature * 200) / 0x100000) - 53
+    def get_temperature_and_humidity(self):
+        data = self.read_data()
+        humidity = ((data[1] << 16) | (data[2] << 8) | data[3]) >> 4
+        temperature = ((data[3] & 0x0F) << 16) | (data[4] << 8) | data[5]
+
+        humidity = (humidity * 100) / 1048576
+        temperature = ((temperature * 200) / 1048576) - 53
+
         return temperature, humidity
 
-    def get_temperature(self) -> float:
-        temperature, _ = self.get_temperature_and_humidity()
+    def get_temperature(self):
+        data = self.read_data()
+        temperature = ((data[3] & 0x0F) << 16) | (data[4] << 8) | data[5]
+        temperature = ((temperature * 200) / 1048576) - 53
         return temperature
 
-    def get_humidity(self) -> float:
-        _, humidity = self.get_temperature_and_humidity()
+    def get_humidity(self):
+        data = self.read_data()
+        humidity = ((data[1] << 16) | (data[2] << 8) | data[3]) >> 4
+        humidity = (humidity * 100) / 1048576
         return humidity
 
 
@@ -792,7 +794,8 @@ def handle_request(conn: Any) -> None:
         return
 
     elif "POST /update_software" in request:
-        if not cloud_updater.updates_available:
+        updates_available = cloud_updater.check_for_updates()
+        if not updates_available:
             conn.send("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n")
             conn.send(json.dumps({"status": "no updates available"}))
             conn.close()
@@ -1289,6 +1292,7 @@ while True:
 
     sleep(5)
 
+cloud_updater = CloudUpdater()
 pico_timer = CustomTimer()
 sensors = Sensors()
 # storage_sensor = StorageSensor()
@@ -1302,7 +1306,7 @@ memory_sensor = MemorySensor()
 #    "memory.log", HISTORY_LENGTH, pico_timer, sensor_type="memory"
 # )
 # memory_monitor = SensorMonitor(memory_sensor, memory_sensor_history)
-cloud_updater = CloudUpdater()
+
 # friend_finder = FriendFinder(network_connection)
 
 
