@@ -15,26 +15,14 @@ cors = CORS(
 )
 
 
-@app.route("/data", methods=["GET"])
-def get_data():
-    # Simulate real-time data with random values
-    data = []
-    for _ in range(5):
-        data.append(random.uniform(0, 1))  # Generate a random float between 0 and 100
-    print(json.dumps(data, indent=2))
-    return jsonify(data)
-
-
 @app.route("/api/v1/sensor_meta", methods=["GET"])
 def proxy_sensor_meta():
-    # Simulate real-time data with random values
     return get("http://192.168.198.178/api/v1/sensor_meta").json()
 
 
 @app.route("/api/v1/sensor_data", methods=["GET"])
 def proxy_sensor_data():
     sensor_index = request.args.get("sensor_index")
-    # Simulate real-time data with random values
     return get(
         f"http://192.168.198.178/api/v1/sensor_data?sensor_index={sensor_index}"
     ).json()
