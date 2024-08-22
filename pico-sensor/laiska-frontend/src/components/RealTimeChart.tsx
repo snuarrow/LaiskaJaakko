@@ -64,7 +64,9 @@ export default function RealTimeChart({chartLabel, sensorIndex, min, max}: RealT
     };
     if (initial_fetch_done === false) {
       initial_fetch_done = true;
-      fetchData();
+      setTimeout(() => {
+        fetchData();
+      }, 500 * sensorIndex);  // Delay the initial fetch to avoid overloading the microcontroller
     }
     const interval = setInterval(() => {
       fetchData();
