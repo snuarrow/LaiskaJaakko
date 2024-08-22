@@ -1,8 +1,8 @@
 import socket
 from typing import Any
-import ure
+import ure  # type: ignore
 from json import dumps, dump
-from machine import reset, Pin
+from machine import reset  # type: ignore
 from gc import collect
 from components.status_led import StatusLed
 

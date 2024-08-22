@@ -1,9 +1,10 @@
 from time import sleep
-from machine import Timer
-import network
+from machine import Timer  # type: ignore
+import network  # type: ignore
 import json
+from typing import Optional, Tuple
 
-def load_wifi_config() -> tuple:
+def load_wifi_config() -> Tuple[Optional[str], Optional[str]]:
     try:
         with open("wifi_config.json", "r") as f:
             wifi_config = json.load(f)

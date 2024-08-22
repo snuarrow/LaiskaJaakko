@@ -1,5 +1,5 @@
 import time
-from machine import Pin, Timer, reset
+from machine import Pin, Timer, reset  # type: ignore
 from components.status_led import StatusLed
 from os import remove
 

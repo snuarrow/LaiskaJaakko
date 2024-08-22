@@ -1,6 +1,6 @@
 import json
 import random
-from machine import Pin, PWM, Timer
+from machine import Pin, PWM, Timer  # type: ignore
 from time import sleep
 
 class StatusLed:

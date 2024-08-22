@@ -1,9 +1,10 @@
 from gc import collect
-from machine import Timer
+from machine import Timer, reset  # type: ignore
 from time import sleep
 import socket, ssl
 from json import load
 from components.status_led import StatusLed
+from typing import Any
 
 class CloudUpdater:
 
@@ -15,6 +16,7 @@ class CloudUpdater:
     updates_available: bool = False
 
     def __init__(self, status_led: StatusLed) -> None:
+        self.status_led = status_led
         pass
 
     def check_for_updates(self) -> bool:
@@ -32,8 +34,6 @@ class CloudUpdater:
 
     def update(self, timer: Timer = None) -> None:
         print("updating..")
-        global update_mutex
-        update_mutex = True
         sleep(3)
         self.version_config = self._load_file("remote-version.json")
         for file in self.version_config["files_included"]:
@@ -55,15 +55,15 @@ class CloudUpdater:
         request = "GET {} HTTP/1.1\r\nHost: {}\r\nConnection: close\r\n\r\n".format(
             path, host
         )
-        s.write(request.encode("utf-8"))  # type: ignore
+        s.write(request.encode("utf-8"))
         response = b""
         while b"\r\n\r\n" not in response:
-            response += s.read(1)  # type: ignore
+            response += s.read(1)
         _, body = response.split(b"\r\n\r\n", 1)
         with open(local_file_name, "wb") as file:
             file.write(body)
             while True:
-                data = s.read(1024)  # type: ignore
+                data = s.read(1024)
                 if not data:
                     break
                 file.write(data)
@@ -72,7 +72,7 @@ class CloudUpdater:
     def _install_update(self) -> None:
         print("installing update..")
         sleep(1)
-        status_led.signal_cloud_update()
+        self.status_led.signal_cloud_update()
         reset()
 
     def _load_file(self, filename: str) -> Any:

@@ -1,7 +1,7 @@
-from machine import Timer
+from machine import Timer  # type: ignore
 from typing import Tuple, Optional
-import socket, struct, utime
-from time import ticks_ms, ticks_diff
+import socket, struct, utime  # type: ignore
+from time import ticks_ms, ticks_diff  # type: ignore
 
 
 class WebRealTimeClock:
@@ -10,7 +10,7 @@ class WebRealTimeClock:
 
     def __init__(self) -> None:
         self.unix_time, _ = self.get_ntp_time()  # TODO: improve flow, this is ugly
-        self.start_time = ticks_ms()  # type: ignore
+        self.start_time = ticks_ms()
         self.timer = Timer(-1)
         self.update_time_from_ntp()
         self.timer.init(
@@ -40,7 +40,7 @@ class WebRealTimeClock:
             if error:
                 print(error)
                 return
-            self.start_time = ticks_ms()  # type: ignore
+            self.start_time = ticks_ms()
             self.unix_time = new_unix_time
             print("NTP Time Updated:", new_unix_time)
             if new_unix_time < 0:
@@ -53,7 +53,7 @@ class WebRealTimeClock:
             self.unix_time = 946684800  # Default to Jan 1, 2000
 
     def get_current_unix_time(self) -> int:
-        elapsed_time = int(ticks_diff(ticks_ms(), self.start_time) // 1000)  # type: ignore
+        elapsed_time = int(ticks_diff(ticks_ms(), self.start_time) // 1000)
         current_unix_time = self.unix_time + elapsed_time
         return current_unix_time
 

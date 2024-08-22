@@ -1,10 +1,10 @@
 from components.web_real_time_clock import WebRealTimeClock
 from typing import Tuple, Any, Optional
 from os import remove, rename
-from machine import Timer, Pin, ADC, I2C
+from machine import Timer, Pin, ADC, I2C  # type: ignore
 from json import load, dump
-from uos import urandom
-from ubinascii import hexlify
+from uos import urandom  # type: ignore
+from ubinascii import hexlify  # type: ignore
 from time import sleep
 
 HISTORY_LENGTH = 60
@@ -78,7 +78,7 @@ class MoistureSensor(Sensor):
 
 
 class AHT10:
-    def __init__(self, i2c_address, i2c_bus, i2c_sda_pin, i2c_scl_pin, power_pin):
+    def __init__(self, i2c_address: str, i2c_bus: int, i2c_sda_pin: int, i2c_scl_pin: int, power_pin: int) -> None:
         self.i2c_address = i2c_address
         self.power_pin = Pin(power_pin, Pin.OUT)
         self.power_pin.value(1)  # power on AHT10
@@ -86,7 +86,7 @@ class AHT10:
         self.i2c = I2C(i2c_bus, scl=Pin(i2c_scl_pin), sda=Pin(i2c_sda_pin), freq=100000)
         self.init_sensor()
 
-    def init_sensor(self):
+    def init_sensor(self) -> None:
         for i in range(10):
             try:
                 print(f"self.i2c_address: {self.i2c_address}")
@@ -98,39 +98,40 @@ class AHT10:
                     continue
                 raise e
 
-    def read_data(self):
+    def _read_data(self) -> bytes:
         for i in range(10):
             try:
                 self.i2c.writeto(int(self.i2c_address), b"\xAC\x33\x00")
                 sleep(0.1)
-                data = self.i2c.readfrom(int(self.i2c_address), 6)
+                data: bytes = self.i2c.readfrom(int(self.i2c_address), 6)
                 sleep(0.1)
                 return data
             except OSError as e:
                 if i < 9:
                     continue
                 raise e
+        raise Exception("AHT10 read failed")
 
-    def get_temperature_and_humidity(self):
-        data = self.read_data()
-        humidity = ((data[1] << 16) | (data[2] << 8) | data[3]) >> 4
-        temperature = ((data[3] & 0x0F) << 16) | (data[4] << 8) | data[5]
+    def get_temperature_and_humidity(self) -> Tuple[float, float]:
+        data = self._read_data()
+        humidity_int: int = ((data[1] << 16) | (data[2] << 8) | data[3]) >> 4
+        temperature_int: int = ((data[3] & 0x0F) << 16) | (data[4] << 8) | data[5]
 
-        humidity = (humidity * 100) / 1048576
-        temperature = ((temperature * 200) / 1048576) - 53
+        humidity: float = (humidity_int * 100) / 1048576
+        temperature: float = ((temperature_int * 200) / 1048576) - 53
 
         return temperature, humidity
 
-    def get_temperature(self):
-        data = self.read_data()
-        temperature = ((data[3] & 0x0F) << 16) | (data[4] << 8) | data[5]
-        temperature = ((temperature * 200) / 1048576) - 53
+    def get_temperature(self) -> float:
+        data = self._read_data()
+        temperature_int: int = ((data[3] & 0x0F) << 16) | (data[4] << 8) | data[5]
+        temperature: float = ((temperature_int * 200) / 1048576) - 53
         return temperature
 
-    def get_humidity(self):
-        data = self.read_data()
-        humidity = ((data[1] << 16) | (data[2] << 8) | data[3]) >> 4
-        humidity = (humidity * 100) / 1048576
+    def get_humidity(self) -> float:
+        data = self._read_data()
+        humidity_int: int = ((data[1] << 16) | (data[2] << 8) | data[3]) >> 4
+        humidity: float = (humidity_int * 100) / 1048576
         return humidity
 
 
