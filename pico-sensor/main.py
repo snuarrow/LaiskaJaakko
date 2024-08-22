@@ -113,36 +113,41 @@ def set_led(request: Request) -> Tuple[str, int]:
     return dumps({"led": status_led.lit}), 200
 
 
-@app.route("/<path:path>")  # type: ignore
+@app.route('/<path:path>')  # type: ignore
 def static(request: Request, path: str) -> Optional[Response]:
     if "api/v1" in request.url:
         return None
-    file_path = f"/dist/{path}"
-    # Set correct MIME types for different files
-    if path.endswith(".js"):
-        content_type = "application/javascript"
-    elif path.endswith(".css"):
-        content_type = "text/css"
+    accept_encoding = request.headers.get('Accept-Encoding', '')
+    path = f"/dist/{path}"
+    if path.endswith('.js'):
+        if 'gzip' in accept_encoding:
+            return serve_file(f'{path}.gz', 'application/javascript', 'gzip')
+        else:
+            return {"error": "gzip not supported on browser"}, 400
+    elif path.endswith('.css'):
+        return serve_file(path, 'text/css')
     elif path.endswith(".html"):
-        content_type = "text/html"
-    else:
-        content_type = "application/octet-stream"
-
-    return serve_file(file_path, content_type)
+        return serve_file(path, 'text/html')
+    return serve_file(path, 'application/octet-stream')
 
 
-def serve_file(file_path: str, content_type: str) -> Response:
+def serve_file(file_path: str, content_type: str, encoding: str = None) -> Response:
     def file_stream():  # type: ignore
-        print(f"file_path {file_path}")
-        with open(file_path, "rb") as f:
-            while True:
-                chunk = f.read(CHUNK_SIZE)
-                if not chunk:
-                    break
-                yield chunk
-
+        try:
+            with open(file_path, "rb") as f:
+                while True:
+                    chunk = f.read(CHUNK_SIZE)
+                    if not chunk:
+                        break
+                    yield chunk
+        except OSError as e:
+            print(f"File not found: {file_path}")
+            raise e
+    headers = {'Content-Type': content_type}
+    if encoding:
+        headers['Content-Encoding'] = encoding
     return Response(
-        body=file_stream(), headers={"Content-Type": content_type}
+        body=file_stream(), headers=headers
     )  # type: ignore
 
 
