@@ -105,6 +105,10 @@ def set_led(request):
         status_led.disco_start()
     return dumps({"led": status_led.lit}), 200
 
+@app.route('/api/v1/led', methods=['GET'])
+def get_led(request):
+    return dumps({"value": int(status_led.lit)}), 200
+
 @app.route('/<path:path>')
 def static(request, path):
     print(f"im here: {request.url}")
