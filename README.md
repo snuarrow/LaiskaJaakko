@@ -28,4 +28,4 @@ User Manual (BETA RELEASE):
 - When led is blinking blue the sensor is in AP-mode, then connect to hotspot: SSID: iot, pass: laiskajaakko, then navigate to 192.168.4.1 and set your own wifi credentials
 - Do some IT-wizardy and find out from which ip the sensor is found on your wifi subnet
 - Open the ip with browser and enjoy
-- One can reset configured WiFi credentials by pressing the WiFi Reset button for 5 seconds, then led should flash red and the sensor returns to blue flashing AP-mode
+- One can delete configured WiFi credentials by pressing the WiFi Reset button for 5 seconds, then led should blink red and the sensor returns to blue blinking AP-mode
