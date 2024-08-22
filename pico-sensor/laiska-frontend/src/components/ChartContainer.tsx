@@ -1,5 +1,7 @@
 import {useState, useEffect} from 'react';
 import RealTimeChart from './RealTimeChart';
+import { API_URL } from '../config';
+import axios from 'axios';
 
 type SensorMeta = {
     name: string;
@@ -11,21 +13,21 @@ type SensorMeta = {
 export default function ChartContainer() {
     const [data, setData] = useState<SensorMeta[]>([]);
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
+
     useEffect(() => {
-        fetch('http://localhost:5123/api/v1/sensor_meta')
-            .then(response => response.json())
-            .then(data => {
-                setData(data);
+        const fetchSensorMeta = async () => {
+            try {
+                const response = await axios.get(API_URL+'/api/v1/sensor_meta');
+                setData(response.data);
                 setLoading(false);
-            })
-            .catch((error) => {
-                setError(error);
+            } catch (error) {
+                console.error('Error fetching sensor meta:', error);
                 setLoading(false);
-            });
+            }
+        };
+        fetchSensorMeta();
     }, []);
     if (loading) return <div>Loading...</div>;
-    if (error) return <div>Error: {error}</div>;
 
     return (
         <div>
