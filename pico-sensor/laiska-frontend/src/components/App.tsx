@@ -1,5 +1,5 @@
 import '../App.css'
-import ToggleButton from './ToggleButton';
+import ToggleLed from './ToggleLed';
 import ChartContainer from './ChartContainer';
 
 function App() {
@@ -7,7 +7,7 @@ function App() {
     <>
       <div style={{ width: '100%', margin: 'auto', paddingTop: '0px', paddingRight: '100px' }}>
         <h2>LaiskaJaakko Yöperho v0.7</h2>
-        <ToggleButton />
+        <ToggleLed />
         <ChartContainer />
       </div>
     </>

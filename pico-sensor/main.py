@@ -6,9 +6,13 @@ from components.ap_web_server import start_ap_web_server
 from components.web_real_time_clock import WebRealTimeClock
 from components.cloud_updater import CloudUpdater
 from components.sensors import Sensors
+from components.helpers import get_flash_sizes
 from microdot import Microdot, Response
 from time import sleep
 from json import dumps, load
+
+total_flash, free_flash = get_flash_sizes()
+print(f"Total flash: {total_flash} KB, Free flash: {free_flash} KB")
 
 frequency_MHz = 125
 freq(frequency_MHz * 1000000)
@@ -39,8 +43,6 @@ print(f"time is: {rtc.get_pretty_time()}")
 cloud_updater = CloudUpdater(status_led=status_led)
 print(f"current version is: {cloud_updater.pretty_current_version()}")
 
-#print(f"updates available: {cloud_updater.check_for_updates()}")
-
 sensors = Sensors(rtc=rtc)
 print("starting app")
 app = Microdot()
@@ -58,8 +60,6 @@ def get_meta(request):
 
 @app.route('/api/v1/sensor_data', methods=['GET'])
 def get_data(request):
-    print(f"request: {request}")
-    # Parse query parameters
     sensor_index = int(request.args.get('sensor_index', 0))
     sensor_monitor = sensors.get_sensor(index=sensor_index)
     try:
@@ -78,11 +78,8 @@ def get_data(request):
             pass
     
     min, max = sensor.limits()
-    
-    # Process the parameters (for example, just return them back)
+
     response_data = {
-        # "labels": labels,
-        # "values": sensor_monitor.get_data(),
         "index": sensor_index,
         "name": name,
         "type": sensor_monitor.history.sensor_type,
@@ -94,10 +91,13 @@ def get_data(request):
     
     return dumps(response_data), 200
 
+@app.route('/api/v1/led', methods=['GET'])
+def get_led(request):
+    return dumps({"value": int(status_led.lit)}), 200
+
 @app.route('/api/v1/led', methods=['POST'])
 def set_led(request):
     data = request.json
-    print(f"led data: {data}")
     value = data.get('value')
     if value == 0:
         status_led.disco_stop()
@@ -111,12 +111,9 @@ def get_led(request):
 
 @app.route('/<path:path>')
 def static(request, path):
-    print(f"im here: {request.url}")
     if "api/v1" in request.url:
-        print("im also here")
         return
     file_path = f'/dist/{path}'
-    print(f"serving: {file_path}")
     # Set correct MIME types for different files
     if path.endswith('.js'):
         content_type = 'application/javascript'
@@ -142,8 +139,5 @@ def serve_file(file_path, content_type):
     
     return Response(body=file_stream(), headers={'Content-Type': content_type})
 
-
-# Run the app
-print("app.run before")
+print("all set")
 app.run(host='0.0.0.0', port=80)
-print("app run after")
