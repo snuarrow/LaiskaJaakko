@@ -1,4 +1,4 @@
-from machine import Pin, freq
+from machine import Pin, freq  # type: ignore
 from components.status_led import StatusLed
 from components.wifi_reset_button import WifiResetButton
 from components.network_connection import NetworkConnection
@@ -7,9 +7,10 @@ from components.web_real_time_clock import WebRealTimeClock
 from components.cloud_updater import CloudUpdater
 from components.sensors import Sensors
 from components.helpers import get_flash_sizes
-from microdot import Microdot, Response
+from microdot import Microdot, Response, Request  # type: ignore
 from time import sleep
 from json import dumps, load
+from typing import Tuple, Optional
 
 total_flash, free_flash = get_flash_sizes()
 print(f"Total flash: {total_flash} KB, Free flash: {free_flash} KB")
@@ -47,20 +48,24 @@ sensors = Sensors(rtc=rtc)
 print("starting app")
 app = Microdot()
 
-@app.route('/')
-def index(request):
-    with open('/dist/index.html') as f:
-        return f.read(), 200, {'Content-Type': 'text/html'}
 
-@app.route('/api/v1/sensor_meta', methods=['GET'])
-def get_meta(request):
+@app.route("/")  # type: ignore
+def index(request: Request) -> Tuple[str, int, dict[str, str]]:
+    print("type of request", type(request))
+    with open("/dist/index.html") as f:
+        return f.read(), 200, {"Content-Type": "text/html"}
+
+
+@app.route("/api/v1/sensor_meta", methods=["GET"])  # type: ignore
+def get_meta(request: Request) -> Tuple[str, int]:
     with open(CONFIG_FILE, "r") as f:
-            sensor_meta = load(f)["sensors"]
+        sensor_meta = load(f)["sensors"]
     return dumps(sensor_meta), 200
 
-@app.route('/api/v1/sensor_data', methods=['GET'])
-def get_data(request):
-    sensor_index = int(request.args.get('sensor_index', 0))
+
+@app.route("/api/v1/sensor_data", methods=["GET"])  # type: ignore
+def get_data(request: Request) -> Tuple[str, int]:
+    sensor_index = int(request.args.get("sensor_index", 0))
     sensor_monitor = sensors.get_sensor(index=sensor_index)
     try:
         name = sensor_monitor.sensor.name  # type: ignore
@@ -76,7 +81,7 @@ def get_data(request):
             times.append(elem[1])
         except:
             pass
-    
+
     min, max = sensor.limits()
 
     response_data = {
@@ -88,56 +93,58 @@ def get_data(request):
         "min": min,
         "max": max,
     }
-    
+
     return dumps(response_data), 200
 
-@app.route('/api/v1/led', methods=['GET'])
-def get_led(request):
+
+@app.route("/api/v1/led", methods=["GET"])  # type: ignore
+def get_led(request: Request) -> Tuple[str, int]:
     return dumps({"value": int(status_led.lit)}), 200
 
-@app.route('/api/v1/led', methods=['POST'])
-def set_led(request):
+
+@app.route("/api/v1/led", methods=["POST"])  # type: ignore
+def set_led(request: Request) -> Tuple[str, int]:
     data = request.json
-    value = data.get('value')
+    value = data.get("value")
     if value == 0:
         status_led.disco_stop()
     elif value == 1:
         status_led.disco_start()
     return dumps({"led": status_led.lit}), 200
 
-@app.route('/api/v1/led', methods=['GET'])
-def get_led(request):
-    return dumps({"value": int(status_led.lit)}), 200
 
-@app.route('/<path:path>')
-def static(request, path):
+@app.route("/<path:path>")  # type: ignore
+def static(request: Request, path: str) -> Optional[Response]:
     if "api/v1" in request.url:
-        return
-    file_path = f'/dist/{path}'
+        return None
+    file_path = f"/dist/{path}"
     # Set correct MIME types for different files
-    if path.endswith('.js'):
-        content_type = 'application/javascript'
-    elif path.endswith('.css'):
-        content_type = 'text/css'
-    elif path.endswith('.html'):
-        content_type = 'text/html'
+    if path.endswith(".js"):
+        content_type = "application/javascript"
+    elif path.endswith(".css"):
+        content_type = "text/css"
+    elif path.endswith(".html"):
+        content_type = "text/html"
     else:
-        content_type = 'application/octet-stream'
-    
+        content_type = "application/octet-stream"
+
     return serve_file(file_path, content_type)
 
 
-def serve_file(file_path, content_type):
-    def file_stream():
+def serve_file(file_path: str, content_type: str) -> Response:
+    def file_stream():  # type: ignore
         print(f"file_path {file_path}")
-        with open(file_path, 'rb') as f:
+        with open(file_path, "rb") as f:
             while True:
                 chunk = f.read(CHUNK_SIZE)
                 if not chunk:
                     break
                 yield chunk
-    
-    return Response(body=file_stream(), headers={'Content-Type': content_type})
+
+    return Response(
+        body=file_stream(), headers={"Content-Type": content_type}
+    )  # type: ignore
+
 
 print("all set")
-app.run(host='0.0.0.0', port=80)
+app.run(host="0.0.0.0", port=80)
