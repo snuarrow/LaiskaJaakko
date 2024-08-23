@@ -34,6 +34,13 @@ def proxy_led():
     print(f"led data: {data}")
     return post("http://192.168.198.178/api/v1/led", json=data).json()
 
+@app.route("/api/v1/sensor_name", methods=["POST"])
+def proxy_sensor_name():
+    sensor_index = request.args.get("sensor_index")
+    data = request.json
+    print(f"sensor_index: {sensor_index}, request payload: {data}")
+    return post(f"http://192.168.198.178/api/v1/sensor_name?sensor_index={sensor_index}", json=data).json()
+
 
 @app.route("/api/v1/led", methods=["GET"])
 def proxy_get_led():

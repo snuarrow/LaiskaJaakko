@@ -35,7 +35,7 @@ export default function ChartContainer() {
                 const elements: React.ReactNode[] = [];
                 data.forEach((item, index) => {
                     elements.push(
-                        <RealTimeChart key={index} chartLabel={item.name} sensorIndex={item.index} min={item.min} max={item.max}/>
+                        <RealTimeChart key={index} sensorIndex={item.index} min={item.min} max={item.max}/>
                     );
                 });
                 return elements;

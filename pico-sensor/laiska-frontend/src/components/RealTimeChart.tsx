@@ -9,7 +9,7 @@ import axios from 'axios';
 ChartJS.register(...registerables);
 
 type RealTimeChartProps = {
-  chartLabel: string;
+  //chartLabel: string;
   sensorIndex: number;
   min: number;
   max: number;
@@ -19,9 +19,9 @@ const xAxisOptions: Partial<TimeScaleOptions> = {
   type: 'time',
   // @ts-ignore
   time: {
-      unit: 'minute',
+      unit: 'hour',
       displayFormats: {
-          minute: 'hh:mm',
+          hour: 'HH',
       }
   },
   // @ts-ignore
@@ -30,13 +30,13 @@ const xAxisOptions: Partial<TimeScaleOptions> = {
   }
 }
 
-export default function RealTimeChart({chartLabel, sensorIndex, min, max}: RealTimeChartProps) {
+export default function RealTimeChart({sensorIndex, min, max}: RealTimeChartProps) {
   let initial_fetch_done = false;
   const [chartData, setChartData] = useState({
     labels: [],
     datasets: [
       {
-        label: chartLabel,
+        label: "Loading...",
         data: [],
         pointRadius: 0,
       },
@@ -57,11 +57,12 @@ export default function RealTimeChart({chartLabel, sensorIndex, min, max}: RealT
       try {
         const response = await axios.get(API_URL+'/api/v1/sensor_data?sensor_index='+sensorIndex);
         const dateTimes = response.data.times.map((ts: number) => ts * 1000).map((ts: number) => new Date(ts));
+        const label = response.data.type === "MH-Moisture" ? "Soil Moisture " + sensorIndex + ": " + response.data.name : response.data.name;
         setChartData(() => ({
           labels: dateTimes,
           datasets: [
             {
-              label: response.data.name,
+              label: label,
               data: response.data.values,
               pointRadius: 0,
             },
@@ -89,7 +90,7 @@ export default function RealTimeChart({chartLabel, sensorIndex, min, max}: RealT
     }
     const interval = setInterval(() => {
       fetchData();
-    }, 20000);
+    }, 120000);
     return () => clearInterval(interval);
   }, []);
   return <Line data={chartData} options={chartOptions}/>;

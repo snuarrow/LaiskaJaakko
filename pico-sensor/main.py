@@ -5,7 +5,7 @@ from components.network_connection import NetworkConnection
 from components.ap_web_server import start_ap_web_server
 from components.web_real_time_clock import WebRealTimeClock
 from components.cloud_updater import CloudUpdater
-from components.sensors import Sensors
+from components.sensors import Sensors, save_config
 from components.helpers import get_flash_sizes
 from microdot import Microdot, Response, Request  # type: ignore
 from time import sleep
@@ -102,6 +102,25 @@ def get_data(request: Request) -> Tuple[str, int]:
     return dumps(response_data), 200
 
 
+@app.route("/api/v1/sensor_name", methods=["POST"])  # type: ignore
+def set_meta(request: Request) -> Tuple[str, int]:
+    gc.collect()
+    print("POST /sensor_name")
+    # changes the sensor given name based on query param sensor_index and json payload "given_name": "new_name"
+    sensor_index = int(request.args.get("sensor_index", 0))
+    data = request.json
+    given_name = data.get("newName")
+    print(f"given name: {given_name}")
+    with open(CONFIG_FILE, "r") as f:
+        config = load(f)
+        config["sensors"][sensor_index]["name"] = given_name
+    save_config(updated_config=config)
+    sensor_monitor = sensors.get_sensor(index=sensor_index)
+    sensor_monitor.sensor.name = given_name
+    return dumps({"name": given_name}), 200
+
+
+
 @app.route("/api/v1/led", methods=["GET"])  # type: ignore
 def get_led(request: Request) -> Tuple[str, int]:
     gc.collect()
@@ -133,7 +152,7 @@ def static(request: Request, path: str) -> Optional[Response]:
         else:
             return {"error": "gzip not supported on browser"}, 400
     elif path.endswith(".css"):
-        return serve_file(path, "text/css")
+        return serve_file(f"{path}.gz", "text/css", "gzip")
     elif path.endswith(".html"):
         return serve_file(path, "text/html")
     elif path.endswith(".ico"):

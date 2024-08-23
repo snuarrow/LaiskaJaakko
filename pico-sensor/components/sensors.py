@@ -8,8 +8,8 @@ from ubinascii import hexlify  # type: ignore
 from time import sleep
 from gc import collect
 
-HISTORY_LENGTH = 90
-SAMPLING_FREQUENCY_SECONDS = 120
+HISTORY_LENGTH = 100
+SAMPLING_FREQUENCY_SECONDS = 600
 CONFIG_FILE = "config.json"
 
 def save_config(updated_config: dict[str, Any]) -> None:  # TODO: relocate
