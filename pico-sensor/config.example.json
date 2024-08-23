@@ -1,9 +1,87 @@
 {
     "uuid": null,
+    "sensors": [
+        {
+            "uuid": null,
+            "index": 0,
+            "log_file": "moisture1.log",
+            "name": "Moisture 1",
+            "min_voltage": 0.5,
+            "max_voltage": 3.3,
+            "type": "MH-Moisture",
+            "power_pin": 14,
+            "adc_pin": 26,
+            "min": 0,
+            "max": 100
+        },
+        {
+            "uuid": null,
+            "index": 1,
+            "log_file": "moisture2.log",
+            "name": "Moisture 2",
+            "min_voltage": 0.5,
+            "max_voltage": 3.3,
+            "type": "MH-Moisture",
+            "power_pin": 10,
+            "adc_pin": 27,
+            "min": 0,
+            "max": 100
+        },
+        {
+            "uuid": null,
+            "index": 2,
+            "log_file": "moisture3.log",
+            "name": "Moisture 3",
+            "min_voltage": 0.5,
+            "max_voltage": 3.3,
+            "type": "MH-Moisture",
+            "power_pin": 6,
+            "adc_pin": 28,
+            "min": 0,
+            "max": 100
+        },
+        {
+            "uuid": null,
+            "index": 3,
+            "i2c_bus": 0,
+            "i2c_scl_pin": 1,
+            "name": "AHT10 Temperature",
+            "i2c_address": "0x38",
+            "i2c_sda_pin": 0,
+            "type": "AHT10Temperature",
+            "power_pin": 2,
+            "log_file": "aht10_temperature.log",
+            "min": 0,
+            "max": 35
+        },
+        {
+            "uuid": null,
+            "index": 4,
+            "i2c_bus": 0,
+            "i2c_scl_pin": 1,
+            "name": "AHT10 Humidity",
+            "i2c_address": "0x38",
+            "i2c_sda_pin": 0,
+            "type": "AHT10Humidity",
+            "power_pin": 2,
+            "log_file": "aht10_humidity.log",
+            "min": 0,
+            "max": 100
+        },
+        {
+            "uuid": null,
+            "index": 5,
+            "type": "PicoTemperature",
+            "name": "Pico Temperature",
+            "log_file": "pico_temperature.log",
+            "min": 20,
+            "max": 50
+        }
+    ],
     "name": "YöPerho",
-    "secret": "secret",
+    "cloud_host": "https://yoperho.hexsoft.xyz",
     "hostname": "plant-monitor",
-    "cloud_host": "http://localhost:3000",
+    "secret": "secret",
     "rgb_led": {
         "uuid": null,
         "log_file": "rgb_led.log",
@@ -12,73 +90,5 @@
         "type": "RGBLED",
         "red_pin": 18,
         "green_pin": 17
-    },
-    "sensors": [
-        {
-            "uuid": null,
-            "log_file": "moisture1.log",
-            "name": "Moisture 1",
-            "min_voltage": 0.5,
-            "max_voltage": 3.3,
-            "type": "MH-Moisture",
-            "power_pin": 14,
-            "adc_pin": 26
-        },
-        {
-            "uuid": null,
-            "log_file": "moisture2.log",
-            "name": "Moisture 2",
-            "min_voltage": 0.5,
-            "max_voltage": 3.3,
-            "type": "MH-Moisture",
-            "power_pin": 10,
-            "adc_pin": 27
-        },
-        {
-            "uuid": null,
-            "log_file": "moisture3.log",
-            "name": "Moisture 3",
-            "min_voltage": 0.5,
-            "max_voltage": 3.3,
-            "type": "MH-Moisture",
-            "power_pin": 6,
-            "adc_pin": 28
-        },
-        {
-            "uuid": null,
-            "i2c_bus": 0,
-            "i2c_scl_pin": 1,
-            "name": "AHT10 Temperature",
-            "i2c_address": "0x38",
-            "i2c_sda_pin": 0,
-            "type": "AHT10Temperature",
-            "power_pin": 2,
-            "log_file": "aht10_temperature.log"
-        },
-        {
-            "uuid": null,
-            "i2c_bus": 0,
-            "i2c_scl_pin": 1,
-            "name": "AHT10 Humidity",
-            "i2c_address": "0x38",
-            "i2c_sda_pin": 0,
-            "type": "AHT10Humidity",
-            "power_pin": 2,
-            "log_file": "aht10_humidity.log"
-        },
-        {
-            "uuid": null,
-            "type": "PicoTemperature",
-            "name": "Pico Temperature",
-            "log_file": "pico_temperature.log"
-        },
-        {
-            "name": "WiFi Reset Button",
-            "type": "WiFiButton",
-            "uuid": null,
-            "signal_pin": 3,
-            "power_pin": 5,
-            "log_file": "wifi_button.log"
-        }
-    ]
+    }
 }
