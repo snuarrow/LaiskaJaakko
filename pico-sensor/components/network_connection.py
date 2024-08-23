@@ -4,6 +4,7 @@ import network  # type: ignore
 import json
 from typing import Optional, Tuple
 
+
 def load_wifi_config() -> Tuple[Optional[str], Optional[str]]:
     try:
         with open("wifi_config.json", "r") as f:

@@ -6,9 +6,10 @@ from json import load, dump
 from uos import urandom  # type: ignore
 from ubinascii import hexlify  # type: ignore
 from time import sleep
+from gc import collect
 
-HISTORY_LENGTH = 60
-SAMPLING_FREQUENCY_SECONDS = 60
+HISTORY_LENGTH = 90
+SAMPLING_FREQUENCY_SECONDS = 120
 CONFIG_FILE = "config.json"
 
 def save_config(updated_config: dict[str, Any]) -> None:  # TODO: relocate
@@ -244,7 +245,7 @@ def buffer_list_with_zeros(
         return input_list
 
 
-class SensorHistory:
+class SensorHistory:  # TODO: this class is redundant, merge it with PersistentList
     def __init__(
         self, filename: str, length: int, rtc: WebRealTimeClock, sensor_type: str
     ):
@@ -253,22 +254,16 @@ class SensorHistory:
         self.persistent_history = PersistentList(
             filename=filename, max_lines=HISTORY_LENGTH
         )
-        self.history = self.persistent_history.get_content().copy()
-        print(f"Loaded {len(self.history)} values from {filename}")
+        print(f"Loaded {len(self.persistent_history.get_content())} values from {filename}")
         self.length = length
-        self.history = buffer_list_with_zeros(self.history, HISTORY_LENGTH)
 
     def add(self, value: float) -> list[Tuple[float, int]]:
         event_unix_time = self.rtc.get_current_unix_time()
-        self.history.append((value, event_unix_time))
         self.persistent_history.append(value, event_unix_time)
-        # remove the first element if the history is too long
-        if len(self.history) > self.length:
-            self.history.pop(0)
-        return self.history
+        return self.persistent_history.get_content()
 
     def get(self) -> list[Tuple[float, int]]:
-        return self.history
+        return self.persistent_history.get_content()
 
 
 class SensorMonitor:
@@ -284,6 +279,7 @@ class SensorMonitor:
         )
 
     def _record_data(self, timer: Timer = None) -> None:
+        collect()
         self.history.add(self.sensor.data_interface())
 
     def get_latest(self) -> Tuple[Any, int]:
@@ -298,15 +294,14 @@ class SensorMonitor:
 
 class Sensors:
     sensor_monitors: dict[str, SensorMonitor] = {}
+    sensor_monitors_by_index: list[str] = []
 
     def get_sensor(
         self, uuid: Optional[str] = None, index: Optional[int] = None
     ) -> SensorMonitor:
         if index is not None:
-            print(
-                f"sensor_monitors.items() {list(self.sensor_monitors.keys())[int(index)]}"
-            )
-            return self.sensor_monitors[list(self.sensor_monitors.keys())[int(index)]]
+            uuid = self.sensor_monitors_by_index[index]
+            return self.sensor_monitors[uuid]
         if uuid:
             return self.sensor_monitors[uuid]
         raise ValueError("uuid or index must be provided")
@@ -321,7 +316,7 @@ class Sensors:
                 save_config(config)
             sensor_type = configured_sensor.get("type")
             if sensor_type == "MH-Moisture":
-                self.sensor_monitors[configured_sensor.get("uuid")] = SensorMonitor(
+                sensor_monitor = SensorMonitor(
                     MoistureSensor(
                         power_pin=configured_sensor.get("power_pin"),
                         adc_pin=configured_sensor.get("adc_pin"),
@@ -337,9 +332,8 @@ class Sensors:
                         sensor_type=sensor_type,
                     ),
                 )
-                continue
             elif sensor_type == "AHT10Temperature":
-                self.sensor_monitors[configured_sensor.get("uuid")] = SensorMonitor(
+                sensor_monitor = SensorMonitor(
                     AHT10TemperatureSensor(
                         AHT10(
                             i2c_address=configured_sensor["i2c_address"],
@@ -356,9 +350,8 @@ class Sensors:
                         sensor_type=sensor_type,
                     ),
                 )
-                continue
             elif sensor_type == "AHT10Humidity":
-                self.sensor_monitors[configured_sensor.get("uuid")] = SensorMonitor(
+                sensor_monitor = SensorMonitor(
                     AHT10HumiditySensor(
                         AHT10(
                             i2c_address=configured_sensor["i2c_address"],
@@ -375,9 +368,8 @@ class Sensors:
                         sensor_type=sensor_type,
                     ),
                 )
-                continue
             elif sensor_type == "PicoTemperature":
-                self.sensor_monitors[configured_sensor.get("uuid")] = SensorMonitor(
+                sensor_monitor = SensorMonitor(
                     PicoTemperatureSensor(),
                     SensorHistory(
                         filename=configured_sensor.get("log_file"),
@@ -386,4 +378,5 @@ class Sensors:
                         sensor_type=sensor_type,
                     ),
                 )
-                continue
+            self.sensor_monitors[configured_sensor.get("uuid")] = sensor_monitor
+            self.sensor_monitors_by_index.append(configured_sensor.get("uuid"))
