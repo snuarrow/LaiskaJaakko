@@ -1,3 +1,18 @@
+.root {
+  background-color: black;
+  max-width: "400px";
+}
+
+.appcontainer {
+  max-width: 800px;
+  width: "100%";
+  max-width: 800px;
+}
+
+.appheader {
+  color: lightgray;
+}
+
 .toggle-wrapper {
   display: flex;
   align-items: center;
@@ -27,17 +42,17 @@
 }
 
 .toggle-slider.on {
-  background-color: #4caf50;
+  background-color: #005d03;
 }
 
 .toggle-slider.off {
-  background-color: #ccc;
+  background-color: #505050;
 }
 
 .toggle-knob {
   width: 28px;
   height: 28px;
-  background-color: white;
+  background-color: rgb(167, 167, 167);
   border-radius: 50%;
   position: absolute;
   top: 1px;
@@ -51,7 +66,7 @@
 
 .toggle-label {
   font-size: 16px;
-  color: #333;
+  color: #c2c2c2;
 }
 
 .popup-overlay {
