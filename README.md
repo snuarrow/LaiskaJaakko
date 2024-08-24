@@ -2,14 +2,14 @@
 
 Development started on 07.06.2024, many things are still incomplete
 
-Cheap Open Source WiFi Plant monitor for people who often forget to water their plants
+Cheap Open Source WiFi Iot-sensor monitor platform
 
 Features:
 - Soil Moisture, Air Temperature & Humidity time series monitoring
 - REST JSON endpoints for integrations
 - Web user interface for stand-alone use
 - React.js on Pi Pico W
-- Configure WiFi via pico hosted hotspot
+- Configure WiFi via Pico hosted hotspot
 - Cloud software-update from Git via Web-UI
 - Time series graphs for each sensor in Web-UI
 - Support for 3 plants per Pico for now
