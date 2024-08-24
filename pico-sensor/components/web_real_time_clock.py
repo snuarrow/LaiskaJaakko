@@ -38,7 +38,7 @@ class WebRealTimeClock:
         try:
             new_unix_time, error = self.get_ntp_time()
             if error:
-                print(error)
+                print(f"update from ntp error: {error}")
                 return
             self.start_time = ticks_ms()
             self.unix_time = new_unix_time

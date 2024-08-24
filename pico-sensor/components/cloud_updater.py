@@ -37,7 +37,6 @@ class CloudUpdater:
         sleep(3)
         self.version_config = self._load_file("remote-version.json")
         for file in self.version_config["files_included"]:
-            print(f"downloading {file}")
             self._download_file(file, file)
         self._install_update()
 

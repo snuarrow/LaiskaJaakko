@@ -1,6 +1,6 @@
 from components.web_real_time_clock import WebRealTimeClock
 from typing import Tuple, Any, Optional
-from os import remove, rename
+from os import remove, rename, listdir, mkdir
 from machine import Timer, Pin, ADC, I2C  # type: ignore
 from json import load, dump
 from uos import urandom  # type: ignore
@@ -8,8 +8,8 @@ from ubinascii import hexlify  # type: ignore
 from time import sleep
 from gc import collect
 
-HISTORY_LENGTH = 90
-SAMPLING_FREQUENCY_SECONDS = 120
+HISTORY_LENGTH = 144
+SAMPLING_FREQUENCY_SECONDS = 600
 CONFIG_FILE = "config.json"
 
 def save_config(updated_config: dict[str, Any]) -> None:  # TODO: relocate
@@ -42,7 +42,6 @@ class MoistureSensor(Sensor):
         uuid: str,
     ):
         self.adc_power_pin = Pin(power_pin, Pin.OUT)
-        print(f"adc_pin: {adc_pin}, adc_power_pin: {power_pin}")
         self.adc = ADC(Pin(adc_pin))
         self.voltage_0_percent = voltage_0_percent
         self.voltage_100_percent = voltage_100_percent
@@ -70,7 +69,8 @@ class MoistureSensor(Sensor):
                     / (self.voltage_100_percent - self.voltage_0_percent)
                 )
             )
-            * 100
+            * 100,
+            1
         )
         return percentage
     
@@ -90,7 +90,6 @@ class AHT10:
     def init_sensor(self) -> None:
         for i in range(10):
             try:
-                print(f"self.i2c_address: {self.i2c_address}")
                 self.i2c.writeto(int(self.i2c_address), b"\xE1\x08\x00")
                 sleep(0.1)
                 break
@@ -141,7 +140,7 @@ class AHT10TemperatureSensor(Sensor):
         self.aht10 = aht10
 
     def data_interface(self) -> float:
-        return self.read_temperature()
+        return round(self.read_temperature(), 1)
 
     def read_temperature(self) -> float:
         return self.aht10.get_temperature()
@@ -155,7 +154,7 @@ class AHT10HumiditySensor(Sensor):
         self.aht10 = aht10
 
     def data_interface(self) -> float:
-        return self.read_humidity()
+        return round(self.read_humidity(), 1)
 
     def read_humidity(self) -> float:
         return self.aht10.get_humidity()
@@ -169,7 +168,7 @@ class PicoTemperatureSensor(Sensor):
     temperature_sensor = ADC(4)
 
     def data_interface(self) -> float:
-        return self.read_temperature()
+        return round(self.read_temperature(), 1)
 
     def read_temperature(self) -> float:
         raw_value = self.temperature_sensor.read_u16()
@@ -182,8 +181,11 @@ class PicoTemperatureSensor(Sensor):
 
 
 class PersistentList:
+
     def __init__(self, filename: str, max_lines: int, tail_lines: int = 10) -> None:
-        self.filename: str = filename
+        if "logs" not in listdir():
+            mkdir("logs")
+        self.filename: str = f"/logs/{filename}"
         self.data: list[Tuple[float, int]] = []
         self.max_lines: int = max_lines
         self.tail_lines: int = tail_lines
@@ -222,7 +224,6 @@ class PersistentList:
     def _trim_history_file(self) -> None:
         temporary_file_name = f"{self.filename}.tmp"
         with open(temporary_file_name, "wb") as temporary_file:
-            print("trimming history:", self.filename)
             for item, event_unix_time in self.data:
                 temporary_file.write(f"{item},{event_unix_time}\n")  # type: ignore
         remove(self.filename)
