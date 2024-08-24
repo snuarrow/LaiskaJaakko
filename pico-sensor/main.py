@@ -1,24 +1,26 @@
+from components.helpers import print_memory_usage
 from machine import Pin, freq  # type: ignore
 from components.status_led import StatusLed
 from components.wifi_reset_button import WifiResetButton
 from components.network_connection import NetworkConnection
-from components.ap_web_server import start_ap_web_server
 from components.web_real_time_clock import WebRealTimeClock
 from components.cloud_updater import CloudUpdater
 from components.sensors import Sensors, save_config
-from components.helpers import get_flash_sizes
+from components.helpers import get_flash_sizes, print_memory_usage
 from microdot import Microdot, Response, Request  # type: ignore
 from time import sleep
 from json import dumps, load
 from typing import Tuple, Optional
-import gc
+from gc import collect
 from machine import Timer
+print_memory_usage()
 
 # Function to perform garbage collection
 def gc_collect(timer):
-    gc.collect()
+    print_memory_usage()
+    collect()
     print("Garbage collection performed.")
-
+    print_memory_usage()
 
 # Set up a timer to run gc_collect every 30 seconds
 timer = Timer()
@@ -37,6 +39,7 @@ WifiResetButton(power_pin=5, signal_pin=3, status_led=status_led, pico_led=pico_
 network_connection = NetworkConnection()
 while True:
     if network_connection.ap_active():
+        from components.ap_web_server import start_ap_web_server
         status_led.ap_mode_start()
         start_ap_web_server(status_led=status_led)
     if network_connection.wlan_active():
@@ -54,15 +57,14 @@ app = Microdot()
 
 @app.route("/")  # type: ignore
 def index(request: Request) -> Tuple[str, int, dict[str, str]]:
-    gc.collect()
-    print("type of request", type(request))
+    collect()
     with open("/dist/index.html") as f:
         return f.read(), 200, {"Content-Type": "text/html"}
 
 
 @app.route("/api/v1/sensor_meta", methods=["GET"])  # type: ignore
 def get_meta(request: Request) -> Tuple[str, int]:
-    gc.collect()
+    collect()
     with open(CONFIG_FILE, "r") as f:
         sensor_meta = load(f)["sensors"]
     return dumps(sensor_meta), 200
@@ -70,7 +72,7 @@ def get_meta(request: Request) -> Tuple[str, int]:
 
 @app.route("/api/v1/sensor_data", methods=["GET"])  # type: ignore
 def get_data(request: Request) -> Tuple[str, int]:
-    gc.collect()
+    collect()
     sensor_index = int(request.args.get("sensor_index", 0))
     sensor_monitor = sensors.get_sensor(index=sensor_index)
     try:
@@ -89,6 +91,7 @@ def get_data(request: Request) -> Tuple[str, int]:
             times.append(elem[1])
         except:
             pass
+
     min, max = sensor.limits()
     response_data = {
         "index": sensor_index,
@@ -104,13 +107,11 @@ def get_data(request: Request) -> Tuple[str, int]:
 
 @app.route("/api/v1/sensor_name", methods=["POST"])  # type: ignore
 def set_meta(request: Request) -> Tuple[str, int]:
-    gc.collect()
-    print("POST /sensor_name")
+    collect()
     # changes the sensor given name based on query param sensor_index and json payload "given_name": "new_name"
     sensor_index = int(request.args.get("sensor_index", 0))
     data = request.json
     given_name = data.get("newName")
-    print(f"given name: {given_name}")
     with open(CONFIG_FILE, "r") as f:
         config = load(f)
         config["sensors"][sensor_index]["name"] = given_name
@@ -123,13 +124,13 @@ def set_meta(request: Request) -> Tuple[str, int]:
 
 @app.route("/api/v1/led", methods=["GET"])  # type: ignore
 def get_led(request: Request) -> Tuple[str, int]:
-    gc.collect()
+    collect()
     return dumps({"value": int(status_led.lit)}), 200
 
 
 @app.route("/api/v1/led", methods=["POST"])  # type: ignore
 def set_led(request: Request) -> Tuple[str, int]:
-    gc.collect()
+    collect()
     data = request.json
     value = data.get("value")
     if value == 0:
@@ -141,7 +142,7 @@ def set_led(request: Request) -> Tuple[str, int]:
 
 @app.route("/<path:path>")  # type: ignore
 def static(request: Request, path: str) -> Optional[Response]:
-    gc.collect()
+    collect()
     if "api/v1" in request.url:
         return None
     accept_encoding = request.headers.get("Accept-Encoding", "")
@@ -180,4 +181,9 @@ def serve_file(file_path: str, content_type: str, encoding: str = None) -> Respo
 
 
 print("all set")
-app.run(host="0.0.0.0", port=80)
+print_memory_usage()
+try:
+    app.run(host="0.0.0.0", port=80)
+except Exception as e:
+    print("Exception in app.run", e)
+    raise e

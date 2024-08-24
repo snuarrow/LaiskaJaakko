@@ -38,7 +38,7 @@ export default function RealTimeChart({sensorIndex, min, max}: RealTimeChartProp
       {
         label: "Loading...",
         data: [],
-        pointRadius: 0,
+        pointRadius: 2,
       },
     ],
   });
@@ -64,7 +64,7 @@ export default function RealTimeChart({sensorIndex, min, max}: RealTimeChartProp
             {
               label: label,
               data: response.data.values,
-              pointRadius: 0,
+              pointRadius: 2,
             },
           ],
         }));
@@ -90,7 +90,7 @@ export default function RealTimeChart({sensorIndex, min, max}: RealTimeChartProp
     }
     const interval = setInterval(() => {
       fetchData();
-    }, 120000);
+    }, 60000);
     return () => clearInterval(interval);
   }, []);
   return <Line data={chartData} options={chartOptions}/>;

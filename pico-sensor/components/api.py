@@ -6,7 +6,6 @@ CHUNK_SIZE = 1024
 
 @app.route('/')
 def index(request):
-    print("here!!")
     with open('/dist/index.html') as f:
         return f.read(), 200, {'Content-Type': 'text/html'}
 
@@ -14,7 +13,6 @@ def index(request):
 @app.route('/<path:path>')
 def static(request, path):
     file_path = f'/dist/{path}'
-    print(f"serving: {file_path}")
     # Set correct MIME types for different files
     if path.endswith('.js'):
         content_type = 'application/javascript'
@@ -30,7 +28,6 @@ def static(request, path):
 
 def serve_file(file_path, content_type):
     def file_stream():
-        print(f"file_path {file_path}")
         with open(file_path, 'rb') as f:
             while True:
                 chunk = f.read(CHUNK_SIZE)
