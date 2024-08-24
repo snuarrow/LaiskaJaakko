@@ -11,7 +11,9 @@ const Toolbar = () => {
   return (
     <div className="toolbar">
       <ToggleLed />
-      <button onClick={togglePopup} className="toolbar-button">Edit</button>
+      <button onClick={togglePopup} className="toolbar-button">
+        Edit
+      </button>
       <Popup isOpen={isPopupOpen} />
     </div>
   );

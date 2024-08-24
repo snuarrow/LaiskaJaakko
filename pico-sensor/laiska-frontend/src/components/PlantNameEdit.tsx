@@ -1,14 +1,17 @@
-import React, { useState } from 'react';
-import axios from 'axios';
-import { API_URL } from '../config';
+import React, { useState } from "react";
+import axios from "axios";
+import { API_URL } from "../config";
 
 interface OneLinerProps {
-    sensorName: string;
-    sensorIndex: number;
+  sensorName: string;
+  sensorIndex: number;
 }
 
-const PlantNameEdit: React.FC<OneLinerProps> = ({ sensorName, sensorIndex }) => {
-  const [oneLiner, setOneLiner] = useState<string>('');
+const PlantNameEdit: React.FC<OneLinerProps> = ({
+  sensorName,
+  sensorIndex,
+}) => {
+  const [oneLiner, setOneLiner] = useState<string>("");
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setOneLiner(e.target.value);
@@ -17,9 +20,12 @@ const PlantNameEdit: React.FC<OneLinerProps> = ({ sensorName, sensorIndex }) => 
   // Handle form submission
   const handleSubmit = async () => {
     try {
-      await axios.post(API_URL+"/api/v1/sensor_name?sensor_index="+sensorIndex, { "newName": oneLiner });
+      await axios.post(
+        API_URL + "/api/v1/sensor_name?sensor_index=" + sensorIndex,
+        { newName: oneLiner },
+      );
     } catch (error) {
-      console.error('Error posting the one-liner:', error);
+      console.error("Error posting the one-liner:", error);
     }
   };
 
@@ -27,14 +33,16 @@ const PlantNameEdit: React.FC<OneLinerProps> = ({ sensorName, sensorIndex }) => 
     <div>
       <h3>Soil Moisture {sensorIndex + 1}</h3>
       <div className="plantedit">
-      <input
-        className="plantedit-input"
-        type="text"
-        value={oneLiner}
-        onChange={handleInputChange}
-        placeholder={sensorName}
-      />
-      <button className="toolbar-button" onClick={handleSubmit}>Save</button>
+        <input
+          className="plantedit-input"
+          type="text"
+          value={oneLiner}
+          onChange={handleInputChange}
+          placeholder={sensorName}
+        />
+        <button className="toolbar-button" onClick={handleSubmit}>
+          Save
+        </button>
       </div>
     </div>
   );
