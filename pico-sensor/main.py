@@ -7,10 +7,10 @@ from components.web_real_time_clock import WebRealTimeClock
 from components.cloud_updater import CloudUpdater
 from components.sensors import Sensors, save_config
 from components.helpers import get_flash_sizes, print_memory_usage
-from microdot import Microdot, Response, Request  # type: ignore
+from components.microdot import Microdot, Response, Request  # type: ignore
 from time import sleep
 from json import dumps, load
-from typing import Tuple, Optional
+from components.typing import Tuple, Optional
 from gc import collect
 from machine import Timer
 print_memory_usage()
