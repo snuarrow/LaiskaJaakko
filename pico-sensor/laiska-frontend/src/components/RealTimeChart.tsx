@@ -28,6 +28,9 @@ const xAxisOptions: Partial<TimeScaleOptions> = {
   ticks: {
     maxTicksLimit: 7,
   },
+  grid: {
+    color: 'rgba(255, 255, 255, 0.1)', // x-axis grid line color
+  }
 };
 
 export default function RealTimeChart({
@@ -52,6 +55,9 @@ export default function RealTimeChart({
         type: "linear",
         min: min,
         max: max,
+        grid: {
+          color: 'rgba(255, 255, 255, 0.1)', // x-axis grid line color
+        }
       },
       x: xAxisOptions,
     },
@@ -85,6 +91,9 @@ export default function RealTimeChart({
               type: "linear",
               min: min,
               max: max,
+              grid: {
+                color: 'rgba(255, 255, 255, 0.1)', // x-axis grid line color
+              }
             },
             x: xAxisOptions,
           },

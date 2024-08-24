@@ -14,35 +14,37 @@ cors = CORS(
     resources={r"/*": {"origins": ["http://localhost:5173", "http://127.0.0.1:5173"]}},
 )
 
+sensor_url = "http://192.168.156.178"
+
 
 @app.route("/api/v1/sensor_meta", methods=["GET"])
 def proxy_sensor_meta():
-    return get("http://192.168.198.178/api/v1/sensor_meta").json()
+    return get(f"{sensor_url}/api/v1/sensor_meta").json()
 
 
 @app.route("/api/v1/sensor_data", methods=["GET"])
 def proxy_sensor_data():
     sensor_index = request.args.get("sensor_index")
     return get(
-        f"http://192.168.198.178/api/v1/sensor_data?sensor_index={sensor_index}"
+        f"{sensor_url}/api/v1/sensor_data?sensor_index={sensor_index}"
     ).json()
 
 
 @app.route("/api/v1/led", methods=["POST"])
 def proxy_led():
     data = request.json
-    return post("http://192.168.198.178/api/v1/led", json=data).json()
+    return post(f"{sensor_url}/api/v1/led", json=data).json()
 
 @app.route("/api/v1/sensor_name", methods=["POST"])
 def proxy_sensor_name():
     sensor_index = request.args.get("sensor_index")
     data = request.json
-    return post(f"http://192.168.198.178/api/v1/sensor_name?sensor_index={sensor_index}", json=data).json()
+    return post(f"{sensor_url}/api/v1/sensor_name?sensor_index={sensor_index}", json=data).json()
 
 
 @app.route("/api/v1/led", methods=["GET"])
 def proxy_get_led():
-    return get("http://192.168.198.178/api/v1/led").json()
+    return get(f"{sensor_url}/api/v1/led").json()
 
 
 if __name__ == "__main__":
