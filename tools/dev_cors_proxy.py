@@ -14,7 +14,7 @@ cors = CORS(
     resources={r"/*": {"origins": ["http://localhost:5173", "http://127.0.0.1:5173"]}},
 )
 
-sensor_url = "http://192.168.156.178"
+sensor_url = "http://192.168.156.177"
 
 
 @app.route("/api/v1/sensor_meta", methods=["GET"])

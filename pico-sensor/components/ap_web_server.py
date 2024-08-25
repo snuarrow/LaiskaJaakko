@@ -1,5 +1,5 @@
 import socket
-from typing import Any
+from components.typing import Any
 import ure  # type: ignore
 from json import dumps, dump
 from machine import reset  # type: ignore

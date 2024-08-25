@@ -4,7 +4,7 @@ from time import sleep
 import socket, ssl
 from json import load
 from components.status_led import StatusLed
-from typing import Any
+from components.typing import Any
 
 class CloudUpdater:
 

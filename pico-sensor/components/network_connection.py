@@ -2,7 +2,7 @@ from time import sleep
 from machine import Timer  # type: ignore
 import network  # type: ignore
 import json
-from typing import Optional, Tuple
+from components.typing import Optional, Tuple
 
 
 def load_wifi_config() -> Tuple[Optional[str], Optional[str]]:
