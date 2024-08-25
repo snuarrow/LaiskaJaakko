@@ -43,6 +43,7 @@ export default function RealTimeChart({
     labels: [],
     datasets: [
       {
+        fill: true,
         label: "Loading...",
         data: [],
         pointRadius: 2,
@@ -79,6 +80,7 @@ export default function RealTimeChart({
           labels: dateTimes,
           datasets: [
             {
+              fill: true,
               label: label,
               data: response.data.values,
               pointRadius: 2,
