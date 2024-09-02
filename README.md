@@ -23,6 +23,14 @@ Requires following hardware (total cost ~9 euros / unit):
 
 Build guide and printable 3D-models coming soon
 
+Current simple UI:
+
+<img src="https://github.com/snuarrow/LaiskaJaakko/blob/images-to-readme/media/ui-v2.png?raw=true" alt="Current UI" width="400"/>
+
+Current version of unit assembled:
+
+<img src="https://github.com/snuarrow/LaiskaJaakko/blob/images-to-readme/media/assembly-v3.jpeg?raw=true" alt="Current UI" width="400"/>
+
 
 User Manual (BETA RELEASE):
 - When led is blinking blue the sensor is in AP-mode, then connect to hotspot: SSID: iot, pass: laiskajaakko, then navigate to 192.168.4.1 and set your own wifi credentials
