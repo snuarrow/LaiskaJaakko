@@ -14,7 +14,7 @@ Features:
 - Time series graphs for each sensor in Web-UI
 - Support for 3 plants per Pico for now
 
-Features (work in progress)
+Features (work in progress):
 - Remote server for remote use without virtual private networks
 
 Requires following hardware (total cost ~9 euros / unit):
