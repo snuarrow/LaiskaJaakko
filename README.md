@@ -23,7 +23,7 @@ Requires following hardware (total cost ~9 euros / unit):
 - 3x Analog 3.3v soil moisture sensor
 - 3d-printed case
 
-Build guide and printable 3D-models coming soon
+Build guide coming soon
 
 Current simple UI:
 
