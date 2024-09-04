@@ -1,5 +1,5 @@
 from components.web_real_time_clock import WebRealTimeClock
-from components.typing import Tuple, Any, Optional
+from typing import Tuple, Any, Optional
 from os import remove, rename, listdir, mkdir
 from machine import Timer, Pin, ADC, I2C  # type: ignore
 from json import load, dump

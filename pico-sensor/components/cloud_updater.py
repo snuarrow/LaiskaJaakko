@@ -6,10 +6,10 @@ from time import sleep
 import socket, ssl
 from json import load
 from components.status_led import StatusLed
-from components.typing import Any
+from typing import Any, Tuple
 
 
-def _is_directory(path) -> bool:
+def _is_directory(path: str) -> bool:
     try:
         stat = os.stat(path)
         # In MicroPython, a directory has the 0x4000 flag set in st_mode
@@ -18,7 +18,7 @@ def _is_directory(path) -> bool:
         return False
 
 
-def _delete_directory_recursively(directory) -> None:
+def _delete_directory_recursively(directory: str) -> None:
     for file_or_dir in listdir(directory):
         full_path = directory + '/' + file_or_dir
         if _is_directory(full_path):
@@ -41,14 +41,14 @@ class CloudUpdater:
         self.status_led = status_led
         pass
 
-    def check_for_updates(self) -> bool:
+    def check_for_updates(self) -> Tuple[int, int, bool]:
         print("checking for updates..")
         self.version_config = self._load_file("version.json")
         self.current_version = int(self.version_config["version"])
         self._download_file("version.json", "remote-version.json")
         self.remote_version_config = self._load_file("remote-version.json")
-        self.remote_version = self.remote_version_config["version"]
-        self.updates_available = self.remote_version > self.current_version
+        self.remote_version: int = self.remote_version_config["version"]
+        self.updates_available: bool = self.remote_version > self.current_version
         return self.current_version, self.remote_version, self.updates_available
 
     def pretty_current_version(self) -> str:
@@ -88,17 +88,17 @@ class CloudUpdater:
         request = "GET {} HTTP/1.1\r\nHost: {}\r\nConnection: close\r\n\r\n".format(
             path, host
         )
-        s.write(request.encode("utf-8"))
+        s.write(request.encode("utf-8"))  # type: ignore
         response = b""
         while b"\r\n\r\n" not in response:
-            response += s.read(1)
+            response += s.read(1)  # type: ignore
         _, body = response.split(b"\r\n\r\n", 1)
         print(f"writing to local file: {local_file_name}")
         with open(local_file_name, "wb") as file:
             file.write(body)
             while True:
                 collect()
-                data = s.read(1024)
+                data = s.read(1024)  # type: ignore
                 if not data:
                     break
                 file.write(data)
