@@ -1,6 +1,6 @@
 from os import statvfs
-from gc import collect, mem_alloc, mem_free
-from components.typing import Tuple
+from gc import collect, mem_alloc, mem_free  #  type: ignore
+from typing import Tuple
 
 
 def get_flash_sizes() -> Tuple[int, int]:
@@ -12,7 +12,7 @@ def get_flash_sizes() -> Tuple[int, int]:
     return int(total_flash_kb), int(free_flash_kb)
 
 
-def print_memory_usage():
+def print_memory_usage() -> None:
     collect()
     total_memory = mem_alloc() + mem_free()
     used_memory = mem_alloc()

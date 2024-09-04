@@ -1,5 +1,5 @@
 from machine import Timer  # type: ignore
-from components.typing import Tuple, Optional
+from typing import Tuple, Optional
 import socket, struct, utime  # type: ignore
 from time import ticks_ms, ticks_diff  # type: ignore
 

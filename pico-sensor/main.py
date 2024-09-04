@@ -5,18 +5,18 @@ from components.wifi_reset_button import WifiResetButton
 from components.network_connection import NetworkConnection
 from components.web_real_time_clock import WebRealTimeClock
 from components.cloud_updater import CloudUpdater
-from components.sensors import Sensors, save_config
+from components.sensors import Sensors, save_config, SensorMonitor, Sensor
 from components.helpers import get_flash_sizes, print_memory_usage
-from components.microdot import Microdot, Response, Request  # type: ignore
+from components.microdot import Microdot, Response, Request
 from time import sleep
 from json import dumps, load
-from components.typing import Tuple, Optional
+from typing import Tuple, Optional, Union
 from gc import collect
 from machine import Timer
 print_memory_usage()
 
 # Function to perform garbage collection
-def gc_collect(timer):
+def gc_collect(timer: Timer) -> None:
     print_memory_usage()
     collect()
     print("Garbage collection performed.")
@@ -52,7 +52,7 @@ cloud_updater = CloudUpdater(status_led=status_led)
 print(f"current version is: {cloud_updater.pretty_current_version()}")
 sensors = Sensors(rtc=rtc)
 print("starting app")
-app = Microdot()
+app = Microdot()  # type: ignore
 
 
 @app.route("/")  # type: ignore
@@ -116,8 +116,8 @@ def set_meta(request: Request) -> Tuple[str, int]:
         config = load(f)
         config["sensors"][sensor_index]["name"] = given_name
     save_config(updated_config=config)
-    sensor_monitor = sensors.get_sensor(index=sensor_index)
-    sensor_monitor.sensor.name = given_name
+    sensor_monitor: SensorMonitor = sensors.get_sensor(index=sensor_index)
+    sensor_monitor.sensor.name = given_name  # type: ignore
     return dumps({"name": given_name}), 200
 
 
@@ -161,7 +161,7 @@ def post_update_firmware(request: Request) -> Tuple[str, int]:
 
 
 @app.route("/<path:path>")  # type: ignore
-def static(request: Request, path: str) -> Optional[Response]:
+def static(request: Request, path: str) -> Optional[Union[Tuple[str, int], Response]]:
     collect()
     if "api/v1" in request.url:
         return None
@@ -171,7 +171,7 @@ def static(request: Request, path: str) -> Optional[Response]:
         if "gzip" in accept_encoding:
             return serve_file(f"{path}.gz", "application/javascript", "gzip")
         else:
-            return {"error": "gzip not supported on browser"}, 400
+            return dumps({"error": "gzip not supported on browser"}), 400
     elif path.endswith(".css"):
         return serve_file(f"{path}.gz", "text/css", "gzip")
     elif path.endswith(".html"):
@@ -181,7 +181,7 @@ def static(request: Request, path: str) -> Optional[Response]:
     return serve_file(path, "application/octet-stream")
 
 
-def serve_file(file_path: str, content_type: str, encoding: str = None) -> Response:
+def serve_file(file_path: str, content_type: str, encoding: str = "") -> Response:
     def file_stream():  # type: ignore
         try:
             with open(file_path, "rb") as f:
@@ -203,7 +203,7 @@ def serve_file(file_path: str, content_type: str, encoding: str = None) -> Respo
 print("all set")
 print_memory_usage()
 try:
-    app.run(host="0.0.0.0", port=80)
+    app.run(host="0.0.0.0", port=80)  # type: ignore
 except Exception as e:
     print("Exception in app.run", e)
     raise e
