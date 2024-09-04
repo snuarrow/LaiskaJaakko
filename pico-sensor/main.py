@@ -140,6 +140,26 @@ def set_led(request: Request) -> Tuple[str, int]:
     return dumps({"led": status_led.lit}), 200
 
 
+@app.route("/api/v1/updates_available", methods=["GET"])  # type: ignore
+def get_updates_availalbe(request: Request) -> Tuple[str, int]:
+    current_version, remote_version, updates_available = cloud_updater.check_for_updates()
+    return dumps({
+        "currentVersion": current_version,
+        "remoteVersion": remote_version,
+        "updatesAvailable": updates_available,
+    }), 200
+
+
+@app.route("/api/v1/update_firmware", methods=["POST"])  # type: ignore
+def post_update_firmware(request: Request) -> Tuple[str, int]:
+    force_update = request.args.get("force", 0)
+    _, _, updates_available = cloud_updater.check_for_updates()
+    if updates_available or force_update:
+        Timer().init(mode=Timer.ONE_SHOT, period=100, callback=cloud_updater.update)
+        return dumps({"message": "firmware update initiated"}), 202
+    return dumps({"error": "no updates available"}), 400
+
+
 @app.route("/<path:path>")  # type: ignore
 def static(request: Request, path: str) -> Optional[Response]:
     collect()
