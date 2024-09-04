@@ -1,10 +1,32 @@
 from gc import collect
+from os import listdir, remove, rmdir, mkdir
+import os
 from machine import Timer, reset  # type: ignore
 from time import sleep
 import socket, ssl
 from json import load
 from components.status_led import StatusLed
 from components.typing import Any
+
+
+def _is_directory(path) -> bool:
+    try:
+        stat = os.stat(path)
+        # In MicroPython, a directory has the 0x4000 flag set in st_mode
+        return stat[0] & 0x4000 == 0x4000
+    except OSError:
+        return False
+
+
+def _delete_directory_recursively(directory) -> None:
+    for file_or_dir in listdir(directory):
+        full_path = directory + '/' + file_or_dir
+        if _is_directory(full_path):
+            _delete_directory_recursively(full_path)
+        else:
+            remove(full_path)
+    rmdir(directory)
+
 
 class CloudUpdater:
 
@@ -27,22 +49,34 @@ class CloudUpdater:
         self.remote_version_config = self._load_file("remote-version.json")
         self.remote_version = self.remote_version_config["version"]
         self.updates_available = self.remote_version > self.current_version
-        return self.updates_available
+        return self.current_version, self.remote_version, self.updates_available
 
     def pretty_current_version(self) -> str:
         return f"v.{self.current_version}"
 
     def update(self, timer: Timer = None) -> None:
         print("updating..")
-        sleep(3)
         self.version_config = self._load_file("remote-version.json")
+        for file in self.version_config.get("files_excluded", []):
+            try:
+                remove(file)
+            except:
+                pass
+        try:
+            _delete_directory_recursively("dist")
+        except:
+            pass
+        for directory in self.version_config["directories_included"]:
+            mkdir(directory)
         for file in self.version_config["files_included"]:
             self._download_file(file, file)
         self._install_update()
 
     def _download_file(self, remote_file_name: str, local_file_name: str) -> None:
         collect()
-        https_file_url = f"{self.base_url}{remote_file_name}"
+        if "laiska-frontend/" in local_file_name:
+            local_file_name = local_file_name.replace("laiska-frontend/", "")
+        https_file_url = f"{self.base_url}{remote_file_name}?raw=True"
         print(f"Downloading file.. {https_file_url}")
         _, _, host, path = https_file_url.split("/", 3)
         path = "/" + path
@@ -59,9 +93,11 @@ class CloudUpdater:
         while b"\r\n\r\n" not in response:
             response += s.read(1)
         _, body = response.split(b"\r\n\r\n", 1)
+        print(f"writing to local file: {local_file_name}")
         with open(local_file_name, "wb") as file:
             file.write(body)
             while True:
+                collect()
                 data = s.read(1024)
                 if not data:
                     break

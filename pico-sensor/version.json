@@ -1,14 +1,27 @@
 {
-    "version": 30,
+    "version": 31,
     "files_included": [
-        "main.js",
         "main.py",
-        "pico-charts.js",
         "version.json",
-        "typing.py",
-        "index.html",
         "ap_index.html",
-        "config.example.json",
-        "styles.css"
-    ]
+        "components/typing.py",
+        "components/ap_web_server.py",
+        "components/helpers.py",
+        "components/microdot.py",
+        "components/network_connection.py",
+        "components/sensors.py",
+        "components/status_led.py",
+        "components/typing.py",
+        "components/web_real_time_clock.py",
+        "components/wifi_reset_button.py",
+        "laiska-frontend/dist/assets/index-Ck2Zt85N.css.gz",
+        "laiska-frontend/dist/assets/index-Dp1cc7bk.js.gz",
+        "laiska-frontend/dist/favicon.ico",
+        "laiska-frontend/dist/index.html"
+    ],
+    "directories_included": [
+        "dist",
+        "dist/assets"
+    ],
+    "files_excluded": []
 }
