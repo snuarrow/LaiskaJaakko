@@ -135,3 +135,26 @@ func deleteRegisteredSensor(sensorUUID uuid.UUID) error {
 	}
 	return nil
 }
+
+func loadSensorByUUID(sensorUUID uuid.UUID) (RegisteredSensor, error) {
+	var sensor RegisteredSensor
+	if err := db.Where("sensor_uuid = ?", sensorUUID).First(&sensor).Error; err != nil {
+		return sensor, err
+	}
+	return sensor, nil
+}
+
+func storeSensorReading(sensorUUID uuid.UUID, sensorType string, sensorName string, unixTime int64, userUUID uuid.UUID, value float32) error {
+	sensorReading := SensorReading{
+		SensorUUID: sensorUUID,
+		SensorType: sensorType,
+		SensorName: sensorName,
+		UnixTime:   unixTime,
+		UserUUID:   userUUID,
+		Value:      value,
+	}
+	if err := db.Create(&sensorReading).Error; err != nil {
+		return err
+	}
+	return nil
+}

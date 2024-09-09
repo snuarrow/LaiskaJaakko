@@ -9,11 +9,12 @@ type RegisterSensorRequest struct {
 
 // SensorDataRequest represents the expected JSON payload for sensor data
 type SensorDataRequest struct {
-	SensorUUID string `json:"uuid" binding:"required,uuid"`
-	SensorType string `json:"sensor_type" binding:"required"`
-	SensorName string `json:"sensor_name" binding:"required"`
-	UnixTime   int64  `json:"unix_time" binding:"required,gt=0"`
-	UserUUID   string `json:"user_id" binding:"required"`
+	SensorUUID string  `json:"sensorUUID" binding:"required,uuid"`
+	SensorType string  `json:"sensorType" binding:"required"`
+	SensorName string  `json:"sensorName" binding:"required"`
+	UnixTime   int64   `json:"unixTime" binding:"required,gt=0"`
+	Email      string  `json:"email" binding:"required"`
+	Value      float32 `json:"value" binding:"required"`
 }
 
 // SignupRequest represents the expected JSON payload for user signup

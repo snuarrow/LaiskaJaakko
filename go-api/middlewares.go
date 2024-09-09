@@ -41,7 +41,6 @@ func authMiddleware() gin.HandlerFunc {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "could not parse user uuid from JWT token"})
 		}
 		if err := userJWTExists(userUUID, tokenString); err != nil {
-			fmt.Println("I SHOULD BE HERE")
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid token"})
 			c.Abort()
 			return
