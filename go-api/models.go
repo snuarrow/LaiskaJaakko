@@ -28,6 +28,7 @@ type SensorReading struct {
 	UnixTime   int64     `gorm:"type:bigint"`
 	UserUUID   uuid.UUID `gorm:"type:uuid;not null"`
 	CreatedAt  time.Time `gorm:"autoCreateTime"`
+	Value      float32   `gorm:"type:float"`
 }
 
 type LeasedJWTToken struct {

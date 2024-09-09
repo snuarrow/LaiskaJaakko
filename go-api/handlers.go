@@ -66,38 +66,38 @@ func registerSensorHandler(c *gin.Context) {
 
 // sensorDataHandler handles the POST /sensor_data endpoint
 func sensorDataHandler(c *gin.Context) {
-	sensorSecret := c.GetHeader("SENSOR_SECRET")
-	var sensor RegisteredSensor
-	if err := db.Where("secret = ?", sensorSecret).First(&sensor).Error; err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
-		return
-	}
 	var request SensorDataRequest
 	if err := c.ShouldBindJSON(&request); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	var user AppUser
-	if err := db.Where("id = ?", request.UserUUID).First(&user).Error; err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "user ID not found"})
+	requestSensorSecret := c.GetHeader("SENSOR_SECRET")
+
+	// load registered sensor by sensor_id, then match: user_email, sensor_secret
+	sensorUUID, err := uuid.Parse(request.SensorUUID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "could not parse sensor UUID"})
 		return
 	}
-	requestUserUUID, err := uuid.Parse(request.UserUUID)
+	sensor, err := loadSensorByUUID(sensorUUID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "could not parse user UUID"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "sensor not found"})
+		return
 	}
-	if requestUserUUID != sensor.UserUUID {
+	if sensor.Secret != requestSensorSecret {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
 	}
-	sensorReading := SensorReading{
-		SensorUUID: sensor.SensorUUID,
-		SensorType: request.SensorType,
-		SensorName: request.SensorName,
-		UnixTime:   request.UnixTime,
-		UserUUID:   user.UUID,
+	user, err := loadUserByEmail(request.Email)
+	if sensor.UserUUID != user.UUID {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
 	}
-	if err := db.Create(&sensorReading).Error; err != nil {
+
+	// checks ok, now write record to database
+	if err := storeSensorReading(
+		sensor.SensorUUID, request.SensorType, request.SensorName, request.UnixTime, user.UUID, request.Value,
+	); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to register sensor data"})
 		return
 	}

@@ -9,6 +9,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestPingRoute(t *testing.T) {
@@ -186,4 +187,52 @@ func TestRegisterSensorRouteFailInvalidAdminSecret(t *testing.T) {
 	assert.Equal(t, "{\"error\":\"unauthorized\"}", w.Body.String())
 	sensorUUID, _ := uuid.Parse(sensorUUIDstr)
 	deleteRegisteredSensor(sensorUUID)
+}
+
+func TestSensorDataRoute(t *testing.T) {
+	router, userEmail, _, sensorUUID, sensorSecret := setupWithRegistedSensorAndUser(t)
+	sensorType := "MH-Moisture"
+	sensorName := "Kääpiövuorimänty"
+	unixTime := time.Now().Unix()
+	jsonBody := fmt.Sprintf(`{
+		"sensorUUID": "%s",
+		"sensorType": "%s",
+		"sensorName": "%s",
+		"unixTime": %d,
+		"email": "%s",
+		"value": 47.6
+	}`, sensorUUID, sensorType, sensorName, unixTime, userEmail)
+	req, _ := http.NewRequest("POST", "/sensor_data", strings.NewReader(jsonBody))
+	req.Header.Set("SENSOR_SECRET", sensorSecret)
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusCreated, w.Code)
+	assert.Equal(t, "{\"message\":\"sensor data registered successfully\"}", w.Body.String())
+	deleteRegisteredSensor(sensorUUID)
+	teardown(userEmail)
+}
+
+func TestSensorDataRouteFailWithInvalidSensorSecret(t *testing.T) {
+	router, userEmail, _, sensorUUID, _ := setupWithRegistedSensorAndUser(t)
+	sensorType := "MH-Moisture"
+	sensorName := "Kääpiövuorimänty"
+	unixTime := time.Now().Unix()
+	jsonBody := fmt.Sprintf(`{
+		"sensorUUID": "%s",
+		"sensorType": "%s",
+		"sensorName": "%s",
+		"unixTime": %d,
+		"email": "%s",
+		"value": 47.6
+	}`, sensorUUID, sensorType, sensorName, unixTime, userEmail)
+	req, _ := http.NewRequest("POST", "/sensor_data", strings.NewReader(jsonBody))
+	req.Header.Set("SENSOR_SECRET", "INVALID_SENSOR_SECRET")
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusUnauthorized, w.Code)
+	assert.Equal(t, "{\"error\":\"unauthorized\"}", w.Body.String())
+	deleteRegisteredSensor(sensorUUID)
+	teardown(userEmail)
 }
