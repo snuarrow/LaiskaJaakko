@@ -182,49 +182,61 @@ class PicoTemperatureSensor(Sensor):
 
 class PersistentList:
 
+    storage_memory_mode = False
+
     def __init__(self, filename: str, max_lines: int, tail_lines: int = 10) -> None:
         if "logs" not in listdir():
             mkdir("logs")
         self.filename: str = f"/logs/{filename}"
-        self.data: list[Tuple[float, int]] = []
+        #self.data: list[Tuple[float, int]] = []
         self.max_lines: int = max_lines
         self.tail_lines: int = tail_lines
-        self._load_from_file()
+
+    def set_storage_memory_mode(self) -> None:
+        #self.storage_memory_mode = True
+        #self.data = []
+        #collect()
+        pass
+    
+    def unset_storage_memory_mode(self) -> None:
+        #self.storage_memory_mode = False
+        #self._load_from_file()
+        pass
 
     def get_content(self) -> list[Tuple[float, int]]:
-        return self.data
+        return self._load_from_file()
 
     def _load_from_file(self) -> None:
-        try:
-            self._read_last_n_lines()
-        except:
-            self.data = []
+        return self._read_last_n_lines()
 
     def _read_last_n_lines(
         self,
     ) -> None:  # TODO: read in reverse order to speedup startup time
-        with open(self.filename, "r") as file:
-            for line in file:
-                line_splits = line.split(",")
-                item = float(line_splits[0])
-                event_unix_time: int = int(line_splits[1])
-                self.data.append((item, event_unix_time))
-                if len(self.data) > self.max_lines:
-                    self.data.pop(0)
+        data = []
+        try:
+            with open(self.filename, "r") as file:
+                for line in file:
+                    line_splits = line.split(",")
+                    item = float(line_splits[0])
+                    event_unix_time: int = int(line_splits[1])
+                    data.append((item, event_unix_time))
+                    if len(data) > self.max_lines:
+                        data.pop(0)
+        except OSError:
+            pass
+        return data
 
     def append(self, item: float, event_unix_time: int) -> None:
-        self.data.append((item, event_unix_time))
-        if len(self.data) > self.max_lines:
-            self.data.pop(0)
         with open(self.filename, "a") as file:
             file.write(f"{item},{event_unix_time}\n")
         if self._history_file_length() > self.max_lines + self.tail_lines:
             self._trim_history_file()
 
     def _trim_history_file(self) -> None:
+        data = self._load_from_file()
         temporary_file_name = f"{self.filename}.tmp"
         with open(temporary_file_name, "wb") as temporary_file:
-            for item, event_unix_time in self.data:
+            for item, event_unix_time in data:
                 temporary_file.write(f"{item},{event_unix_time}\n")  # type: ignore
         remove(self.filename)
         rename(temporary_file_name, self.filename)
@@ -234,19 +246,10 @@ class PersistentList:
             return sum(1 for _ in file)
 
 
-def buffer_list_with_zeros(
-    input_list: list[Tuple[float, int]], n: int
-) -> list[Tuple[float, int]]:  # TODO: bug here, does not work yet with timed elements
-    if len(input_list) < n:
-        num_zeros = n - len(input_list)
-        zeros_list = [0] * num_zeros
-        buffered_list = zeros_list + input_list
-        return buffered_list  # type: ignore
-    else:
-        return input_list
-
-
 class SensorHistory:  # TODO: this class is redundant, merge it with PersistentList
+
+    storage_memory_mode: bool = False
+
     def __init__(
         self, filename: str, length: int, rtc: WebRealTimeClock, sensor_type: str
     ):
@@ -261,10 +264,22 @@ class SensorHistory:  # TODO: this class is redundant, merge it with PersistentL
     def add(self, value: float) -> list[Tuple[float, int]]:
         event_unix_time = self.rtc.get_current_unix_time()
         self.persistent_history.append(value, event_unix_time)
-        return self.persistent_history.get_content()
+        return self.persistent_history.get_content()  # TODO: find out if this return is necessary
 
     def get(self) -> list[Tuple[float, int]]:
         return self.persistent_history.get_content()
+
+
+def buffer_list_with_zeros(
+    input_list: list[Tuple[float, int]], n: int
+) -> list[Tuple[float, int]]:  # TODO: bug here, does not work yet with timed elements
+    if len(input_list) < n:
+        num_zeros = n - len(input_list)
+        zeros_list = [0] * num_zeros
+        buffered_list = zeros_list + input_list
+        return buffered_list  # type: ignore
+    else:
+        return input_list
 
 
 class SensorMonitor:
@@ -280,7 +295,6 @@ class SensorMonitor:
         )
 
     def _record_data(self, timer: Timer = None) -> None:
-        collect()
         self.history.add(self.sensor.data_interface())
 
     def get_latest(self) -> Tuple[Any, int]:
@@ -381,3 +395,5 @@ class Sensors:
                 )
             self.sensor_monitors[configured_sensor.get("uuid")] = sensor_monitor
             self.sensor_monitors_by_index.append(configured_sensor.get("uuid"))
+        
+        print("Sensors initiated ...")

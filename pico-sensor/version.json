@@ -1,26 +1,101 @@
 {
-    "version": 32,
+    "version": 35,
     "files_included": [
-        "main.py",
-        "version.json",
-        "ap_index.html",
-        "typing.py",
-        "components/ap_web_server.py",
-        "components/helpers.py",
-        "components/microdot.py",
-        "components/network_connection.py",
-        "components/sensors.py",
-        "components/status_led.py",
-        "components/web_real_time_clock.py",
-        "components/wifi_reset_button.py",
-        "laiska-frontend/dist/assets/index-Ck2Zt85N.css.gz",
-        "laiska-frontend/dist/assets/index-Dp1cc7bk.js.gz",
-        "laiska-frontend/dist/favicon.ico",
-        "laiska-frontend/dist/index.html"
+        {
+            "repository": "laiska-frontend/dist/assets/index-DpZbFrxV.css.gz",
+            "pico": "dist/assets/index-DpZbFrxV.css.gz",
+            "check": "64749045f094a23d2741ff118712bccb9594984d9bcfe6adeaef5b58a97afd09"
+        },
+        {
+            "repository": "laiska-frontend/dist/assets/index-j1FVgEmo.js.gz",
+            "pico": "dist/assets/index-j1FVgEmo.js.gz",
+            "check": "20989b4ce62d3866662fdc7ad3dffd0c579ae1eb9235a5e4edbe64961eb949b1"
+        },
+        {
+            "repository": "laiska-frontend/dist/favicon.ico",
+            "pico": "dist/favicon.ico",
+            "check": "2ba5bb03a5b014330b6aa91ec5b087a582e80cb6e1f2f18e1c215ac117823040"
+        },
+        {
+            "repository": "laiska-frontend/dist/index.html",
+            "pico": "dist/index.html",
+            "check": "036f8bcb9a0ce46b5114595161953df8fdf8949f8b54c7ec6541b8643815e90d"
+        },
+        {
+            "repository": "components/app.py",
+            "pico": "components/app.py",
+            "check": "5e1778231d4f1b12dde1a0a8f10f60426bf18172297ee5cd605754b70817901d"
+        },
+        {
+            "repository": "main.py",
+            "pico": "main.py",
+            "check": "aebce14f3b9d506f3dc5374ec5a508926c36cb5edc7c9be5ab0f97c09bacf578"
+        },
+        {
+            "repository": "ap_index.html",
+            "pico": "ap_index.html",
+            "check": "224032bf59f18ee5599377691a0e52d849b4f07f891e0696cefcfbf1294a5bec"
+        },
+        {
+            "repository": "typing.py",
+            "pico": "typing.py",
+            "check": "0d969a06486804cec30cf128322c407f4e250c52dce39ec78e8ab30ae4b74db4"
+        },
+        {
+            "repository": "components/flasher.py",
+            "pico": "components/flasher.py",
+            "check": "b0de81c76df3105bb58cfb598e1cc9eefe0473b9c0ed0f910b5d97ec719e5b82"
+        },
+        {
+            "repository": "components/wifi_reset_button.py",
+            "pico": "components/wifi_reset_button.py",
+            "check": "5e89193a728c49e2626a44562117a1f8f90c58952f7c78cb19bb0891e2d9c50e"
+        },
+        {
+            "repository": "components/ap_web_server.py",
+            "pico": "components/ap_web_server.py",
+            "check": "eddd6ca024a0ebb03d2f36730fb05e797779d8ab6d9a54a214ea2e6b0b5f10a4"
+        },
+        {
+            "repository": "components/helpers.py",
+            "pico": "components/helpers.py",
+            "check": "e585009352720ea15ef7af20f4fed1f5e6fda607fade1fcf89ec87a803bf8e4d"
+        },
+        {
+            "repository": "components/cloud_updater.py",
+            "pico": "components/cloud_updater.py",
+            "check": "018ea8a5c6f10bc08b5f2ce36308958e6799247533394714592c32a4fd6d66b9"
+        },
+        {
+            "repository": "components/microdot.py",
+            "pico": "components/microdot.py",
+            "check": "8c70d27a72c3896f557bc575d33fd3fb27c9a1d62d31322faabfe5d92a3ebcb0"
+        },
+        {
+            "repository": "components/network_connection.py",
+            "pico": "components/network_connection.py",
+            "check": "4b44fdec843d626f2447a067eba410d7466f5b8c84567a51910b23990a881305"
+        },
+        {
+            "repository": "components/sensors.py",
+            "pico": "components/sensors.py",
+            "check": "bd3dd8a0bb04d580e0a822df0fdb250623bff25ca645f4d1ecd10c8e7e09f54e"
+        },
+        {
+            "repository": "components/status_led.py",
+            "pico": "components/status_led.py",
+            "check": "0098c6398a6d98a47d241619a85b9236d7e7843e557b3bfdc2c11174870769b7"
+        },
+        {
+            "repository": "components/web_real_time_clock.py",
+            "pico": "components/web_real_time_clock.py",
+            "check": "e182923e827f086e207211378f1604b2cf2d6aa47f386dcf3742bcb7e6152e86"
+        }
     ],
     "directories_included": [
         "dist",
-        "dist/assets"
+        "dist/assets",
+        "components"
     ],
     "files_excluded": []
 }

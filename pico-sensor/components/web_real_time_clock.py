@@ -9,13 +9,14 @@ class WebRealTimeClock:
     NTP_SERVER = "pool.ntp.org"
 
     def __init__(self) -> None:
-        self.unix_time, _ = self.get_ntp_time()  # TODO: improve flow, this is ugly
+        self.unix, _ = self.get_ntp_time()  # TODO: improve flow, this is ugly
         self.start_time = ticks_ms()
         self.timer = Timer(-1)
         self.update_time_from_ntp()
         self.timer.init(
             period=3600000, mode=Timer.PERIODIC, callback=self.update_time_from_ntp
         )
+        print(f"time is: {self.get_pretty_time()}")
 
     def get_ntp_time(self) -> Tuple[int, Optional[str]]:  # time, error
         try:
@@ -26,8 +27,7 @@ class WebRealTimeClock:
             s.sendto(ntp_query, addr)
             msg = s.recv(48)
             s.close()
-            val = struct.unpack("!I", msg[40:44])[0]
-            return val - self.NTP_DELTA, None
+            return struct.unpack("!I", msg[40:44])[0] - self.NTP_DELTA, None
         except:
             return (
                 946684800,
@@ -41,20 +41,20 @@ class WebRealTimeClock:
                 print(f"update from ntp error: {error}")
                 return
             self.start_time = ticks_ms()
-            self.unix_time = new_unix_time
+            self.unix = new_unix_time
             print("NTP Time Updated:", new_unix_time)
             if new_unix_time < 0:
                 print(
                     "NTP time is negative, defaulting to Jan 1 2000"
                 )  # TODO: this is a temporary fix, find out why NTP time is occasionally negative
-                self.unix_time = 946684800
+                self.unix = 946684800
         except Exception as e:
             print("Failed to update NTP time:", e)
-            self.unix_time = 946684800  # Default to Jan 1, 2000
+            self.unix = 946684800  # Default to Jan 1, 2000
 
     def get_current_unix_time(self) -> int:
         elapsed_time = int(ticks_diff(ticks_ms(), self.start_time) // 1000)
-        current_unix_time = self.unix_time + elapsed_time
+        current_unix_time = self.unix + elapsed_time
         return current_unix_time
 
     def get_pretty_time(self) -> str:
