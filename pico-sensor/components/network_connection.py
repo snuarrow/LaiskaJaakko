@@ -26,7 +26,7 @@ class NetworkConnection:
         self.ssid, self.password = load_wifi_config()
         self.timer = Timer()
         self.timer.init(
-            period=20000, mode=Timer.PERIODIC, callback=self.check_connectivity
+            period=120000, mode=Timer.PERIODIC, callback=self.check_connectivity
         )
         if self.ssid and self.password:
             self.connect_to_wifi()
