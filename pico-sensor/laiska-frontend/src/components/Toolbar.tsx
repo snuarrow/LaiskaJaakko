@@ -14,7 +14,7 @@ const Toolbar = () => {
       <button onClick={togglePopup} className="toolbar-button">
         Edit
       </button>
-      <Popup isOpen={isPopupOpen} />
+      <Popup isOpen={isPopupOpen} onClose={togglePopup}/>
     </div>
   );
 };
