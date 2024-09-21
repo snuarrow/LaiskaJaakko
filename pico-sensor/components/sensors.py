@@ -182,6 +182,8 @@ class PicoTemperatureSensor(Sensor):
 
 class PersistentList:
 
+    storage_memory_mode = False
+
     def __init__(self, filename: str, max_lines: int, tail_lines: int = 10) -> None:
         if "logs" not in listdir():
             mkdir("logs")
@@ -191,7 +193,17 @@ class PersistentList:
         self.tail_lines: int = tail_lines
         self._load_from_file()
 
+    def set_storage_memory_mode(self) -> None:
+        self.storage_memory_mode = True
+        self.data = []
+    
+    def unset_storage_memory_mode(self) -> None:
+        self.storage_memory_mode = False
+        self._load_from_file()
+
     def get_content(self) -> list[Tuple[float, int]]:
+        if self.storage_memory_mode:
+            self._load_from_file()
         return self.data
 
     def _load_from_file(self) -> None:
@@ -213,6 +225,8 @@ class PersistentList:
                     self.data.pop(0)
 
     def append(self, item: float, event_unix_time: int) -> None:
+        if self.storage_memory_mode:
+            self._load_from_file()
         self.data.append((item, event_unix_time))
         if len(self.data) > self.max_lines:
             self.data.pop(0)
@@ -222,6 +236,8 @@ class PersistentList:
             self._trim_history_file()
 
     def _trim_history_file(self) -> None:
+        if self.storage_memory_mode:
+            self._load_from_file()
         temporary_file_name = f"{self.filename}.tmp"
         with open(temporary_file_name, "wb") as temporary_file:
             for item, event_unix_time in self.data:
@@ -234,6 +250,47 @@ class PersistentList:
             return sum(1 for _ in file)
 
 
+class SensorHistory:  # TODO: this class is redundant, merge it with PersistentList
+
+    storage_memory_mode: bool = False
+
+    def __init__(
+        self, filename: str, length: int, rtc: WebRealTimeClock, sensor_type: str
+    ):
+        self.sensor_type = sensor_type
+        self.rtc = rtc
+        self.persistent_history = PersistentList(
+            filename=filename, max_lines=HISTORY_LENGTH
+        )
+        print(f"Loaded {len(self.persistent_history.get_content())} values from {filename}")
+        #self.persistent_history.set_storage_memory_mode()
+        self.length = length
+
+    def set_storage_memory_mode(self) -> None:
+        self.storage_memory_mode = True
+        self.persistent_history.set_storage_memory_mode()
+    
+    def unset_storage_memory_mode(self) -> None:
+        self.storage_memory_mode = False
+        self.persistent_history.unset_storage_memory_mode()
+
+    def add(self, value: float) -> list[Tuple[float, int]]:
+        event_unix_time = self.rtc.get_current_unix_time()
+        self.persistent_history.append(value, event_unix_time)
+        if self.storage_memory_mode:
+            data = self.persistent_history.get_content().copy()
+            self.persistent_history.set_storage_memory_mode()
+            return data
+        return self.persistent_history.get_content()
+
+    def get(self) -> list[Tuple[float, int]]:
+        if self.storage_memory_mode:
+            data = self.persistent_history.get_content().copy()
+            self.persistent_history.set_storage_memory_mode()
+            return data
+        return self.persistent_history.get_content()
+
+
 def buffer_list_with_zeros(
     input_list: list[Tuple[float, int]], n: int
 ) -> list[Tuple[float, int]]:  # TODO: bug here, does not work yet with timed elements
@@ -244,27 +301,6 @@ def buffer_list_with_zeros(
         return buffered_list  # type: ignore
     else:
         return input_list
-
-
-class SensorHistory:  # TODO: this class is redundant, merge it with PersistentList
-    def __init__(
-        self, filename: str, length: int, rtc: WebRealTimeClock, sensor_type: str
-    ):
-        self.sensor_type = sensor_type
-        self.rtc = rtc
-        self.persistent_history = PersistentList(
-            filename=filename, max_lines=HISTORY_LENGTH
-        )
-        print(f"Loaded {len(self.persistent_history.get_content())} values from {filename}")
-        self.length = length
-
-    def add(self, value: float) -> list[Tuple[float, int]]:
-        event_unix_time = self.rtc.get_current_unix_time()
-        self.persistent_history.append(value, event_unix_time)
-        return self.persistent_history.get_content()
-
-    def get(self) -> list[Tuple[float, int]]:
-        return self.persistent_history.get_content()
 
 
 class SensorMonitor:
@@ -296,6 +332,18 @@ class SensorMonitor:
 class Sensors:
     sensor_monitors: dict[str, SensorMonitor] = {}
     sensor_monitors_by_index: list[str] = []
+
+    def set_storage_memory_mode(self):
+        for sensor_monitor_uuid in self.sensor_monitors_by_index:
+            sensor_monitor = self.sensor_monitors[sensor_monitor_uuid]
+            sensor_monitor.history.set_storage_memory_mode()
+            collect()
+    
+    def unset_storage_memory_mode(self):
+        for sensor_monitor_uuid in self.sensor_monitors_by_index:
+            sensor_monitor = self.sensor_monitors[sensor_monitor_uuid]
+            sensor_monitor.history.unset_storage_memory_mode()
+            collect()
 
     def get_sensor(
         self, uuid: Optional[str] = None, index: Optional[int] = None

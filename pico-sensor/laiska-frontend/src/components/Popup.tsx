@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import PlantNameEdit from "./PlantNameEdit";
+import UpdateComponent from "./UpdateComponent";
 import { API_URL } from "../config";
 
 interface PopupProps {
   isOpen: boolean;
+  onClose: () => void;
 }
 
 type SensorMeta = {
@@ -13,9 +15,12 @@ type SensorMeta = {
   type: string;
 };
 
-export default function Popup({ isOpen: isOpen }: PopupProps) {
+export default function Popup({ isOpen: isOpen, onClose: onClose }: PopupProps) {
   const handleReload = () => {
-    window.location.reload();
+    //window.location.reload();
+    // close the popup
+    onClose();
+
   };
   const [data, setData] = useState<SensorMeta[]>([]);
   const [loading, setLoading] = useState(true);
@@ -56,6 +61,7 @@ export default function Popup({ isOpen: isOpen }: PopupProps) {
           });
           return elements;
         })()}
+        <UpdateComponent></UpdateComponent>
       </div>
     </div>
   );

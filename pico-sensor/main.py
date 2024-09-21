@@ -1,4 +1,5 @@
 from components.helpers import print_memory_usage
+print_memory_usage()
 from machine import Pin, freq  # type: ignore
 from components.status_led import StatusLed
 from components.wifi_reset_button import WifiResetButton
@@ -13,7 +14,7 @@ from json import dumps, load
 from typing import Tuple, Optional, Union
 from gc import collect
 from machine import Timer
-print_memory_usage()
+
 
 # Function to perform garbage collection
 def gc_collect(timer: Timer) -> None:
@@ -54,9 +55,16 @@ sensors = Sensors(rtc=rtc)
 print("starting app")
 app = Microdot()  # type: ignore
 
+updateRunning = False
+def update_gate() -> Tuple[str, int]:
+    return dumps({"error": "update running"}), 423
+
 
 @app.route("/")  # type: ignore
 def index(request: Request) -> Tuple[str, int, dict[str, str]]:
+    global updateRunning
+    if updateRunning:
+        return update_gate()
     collect()
     with open("/dist/index.html") as f:
         return f.read(), 200, {"Content-Type": "text/html"}
@@ -64,6 +72,9 @@ def index(request: Request) -> Tuple[str, int, dict[str, str]]:
 
 @app.route("/api/v1/sensor_meta", methods=["GET"])  # type: ignore
 def get_meta(request: Request) -> Tuple[str, int]:
+    global updateRunning
+    if updateRunning:
+        return update_gate()
     collect()
     with open(CONFIG_FILE, "r") as f:
         sensor_meta = load(f)["sensors"]
@@ -72,6 +83,9 @@ def get_meta(request: Request) -> Tuple[str, int]:
 
 @app.route("/api/v1/sensor_data", methods=["GET"])  # type: ignore
 def get_data(request: Request) -> Tuple[str, int]:
+    global updateRunning
+    if updateRunning:
+        return update_gate()
     collect()
     sensor_index = int(request.args.get("sensor_index", 0))
     sensor_monitor = sensors.get_sensor(index=sensor_index)
@@ -107,6 +121,9 @@ def get_data(request: Request) -> Tuple[str, int]:
 
 @app.route("/api/v1/sensor_name", methods=["POST"])  # type: ignore
 def set_meta(request: Request) -> Tuple[str, int]:
+    global updateRunning
+    if updateRunning:
+        return update_gate()
     collect()
     # changes the sensor given name based on query param sensor_index and json payload "given_name": "new_name"
     sensor_index = int(request.args.get("sensor_index", 0))
@@ -124,12 +141,18 @@ def set_meta(request: Request) -> Tuple[str, int]:
 
 @app.route("/api/v1/led", methods=["GET"])  # type: ignore
 def get_led(request: Request) -> Tuple[str, int]:
+    global updateRunning
+    if updateRunning:
+        return update_gate()
     collect()
     return dumps({"value": int(status_led.lit)}), 200
 
 
 @app.route("/api/v1/led", methods=["POST"])  # type: ignore
 def set_led(request: Request) -> Tuple[str, int]:
+    global updateRunning
+    if updateRunning:
+        return update_gate()
     collect()
     data = request.json
     value = data.get("value")
@@ -142,7 +165,10 @@ def set_led(request: Request) -> Tuple[str, int]:
 
 @app.route("/api/v1/updates_available", methods=["GET"])  # type: ignore
 def get_updates_availalbe(request: Request) -> Tuple[str, int]:
+    sensors.set_storage_memory_mode()
+    collect()
     current_version, remote_version, updates_available = cloud_updater.check_for_updates()
+    sensors.unset_storage_memory_mode()
     return dumps({
         "currentVersion": current_version,
         "remoteVersion": remote_version,
@@ -153,15 +179,25 @@ def get_updates_availalbe(request: Request) -> Tuple[str, int]:
 @app.route("/api/v1/update_firmware", methods=["POST"])  # type: ignore
 def post_update_firmware(request: Request) -> Tuple[str, int]:
     force_update = request.args.get("force", 0)
+    sensors.set_storage_memory_mode()
     _, _, updates_available = cloud_updater.check_for_updates()
+    global updateRunning
     if updates_available or force_update:
-        Timer().init(mode=Timer.ONE_SHOT, period=100, callback=cloud_updater.update)
-        return dumps({"message": "firmware update initiated"}), 202
+        updateRunning = True
+        #Timer().init(mode=Timer.ONE_SHOT, period=100, callback=cloud_updater.download_update)
+        cloud_updater.download_update()
+        #print("DRY: trigger update")
+        updateRunning = False
+        return dumps({"status": "firmware download completed"}), 200
+    sensors.unset_storage_memory_mode()
     return dumps({"error": "no updates available"}), 400
 
 
 @app.route("/<path:path>")  # type: ignore
 def static(request: Request, path: str) -> Optional[Union[Tuple[str, int], Response]]:
+    global updateRunning
+    if updateRunning:
+        return update_gate()
     collect()
     if "api/v1" in request.url:
         return None
