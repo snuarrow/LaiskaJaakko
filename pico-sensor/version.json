@@ -1,5 +1,5 @@
 {
-    "version": 38,
+    "version": 39,
     "files_included": [
         {
             "repository": "laiska-frontend/dist/assets/index-DpZbFrxV.css.gz",
@@ -44,7 +44,7 @@
         {
             "repository": "components/flasher.py",
             "pico": "components/flasher.py",
-            "check": "dd4d8a8e0af22da5f2cd961fea9167bcd5ebe0339213e3a80d7240ac461a79a6"
+            "check": "a8bd9f87189e8a949e65a9939957a63fcf6f28974536f92492a876cf1d7f4c57"
         },
         {
             "repository": "components/wifi_reset_button.py",
