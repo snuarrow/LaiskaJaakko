@@ -1,14 +1,16 @@
 from json import load, dumps, dump
 from os import mkdir, rename
-from machine import reset
+from machine import reset  # type: ignore
 from gc import collect
 from os import stat, listdir, remove, rmdir
 from immutable.checksum import calculate_checksum
 from time import sleep
+from components.status_led import StatusLed
 
 
 backup_version_dir = "backup_version"
 new_version_dir = "new_version"
+
 
 def _is_directory(path: str) -> bool:
     try:
@@ -18,12 +20,13 @@ def _is_directory(path: str) -> bool:
     except OSError:
         return False
 
-def copy_file(src, dest) -> str | None:
+
+def copy_file(src: str, dest: str) -> str | None:
     try:
         # Open the source file in read mode
-        with open(src, 'rb') as source_file:
+        with open(src, "rb") as source_file:
             # Open the destination file in write mode
-            with open(dest, 'wb') as dest_file:
+            with open(dest, "wb") as dest_file:
                 # Read and write in chunks to avoid memory issues
                 while True:
                     chunk = source_file.read(1024)  # Adjust chunk size if necessary
@@ -31,7 +34,8 @@ def copy_file(src, dest) -> str | None:
                         break
                     dest_file.write(chunk)
     except:
-        return f"Failed to copy: {src} to {dst}"
+        return f"Failed to copy: {src} to {dest}"
+    return None
 
 
 def _delete_directory_recursively(directory: str) -> str | None:
@@ -39,7 +43,7 @@ def _delete_directory_recursively(directory: str) -> str | None:
         return None
     try:
         for file_or_dir in listdir(directory):
-            full_path = directory + '/' + file_or_dir
+            full_path = directory + "/" + file_or_dir
             if _is_directory(full_path):
                 _delete_directory_recursively(full_path)
             else:
@@ -54,7 +58,9 @@ def validate_new_version() -> str | None:
     with open("remote-version.json", "r") as f:
         new_version_config = load(f)
     for file_included in new_version_config["files_included"]:
-        calculated_checksum = calculate_checksum(file_path=new_version_dir + "/"+ file_included["pico"])
+        calculated_checksum = calculate_checksum(
+            file_path=new_version_dir + "/" + file_included["pico"]
+        )
         if calculated_checksum != file_included["check"]:
             return f"Error: Checksum mismatch in new file: {file_included['pico']}"
 
@@ -69,7 +75,9 @@ def delete_backup_version() -> str | None:
     return None
 
 
-def move_files(files: list, origin_dir: str = "", dest_dir: str = "") -> str | None:
+def move_files(
+    files: list[str], origin_dir: str = "", dest_dir: str = ""
+) -> str | None:
     try:
         for relative_path in files:
             absolute_origin_path = origin_dir + "/" + relative_path
@@ -93,6 +101,7 @@ def move_files(files: list, origin_dir: str = "", dest_dir: str = "") -> str | N
 
     return None
 
+
 def make_new_backup_version() -> str | None:
     err = delete_backup_version()
     if err:
@@ -105,7 +114,9 @@ def make_new_backup_version() -> str | None:
     if err:
         return err
 
-    current_version_files = [e["pico"] for e in current_version_config["files_included"]]
+    current_version_files = [
+        e["pico"] for e in current_version_config["files_included"]
+    ]
     err = move_files(files=current_version_files, dest_dir=backup_version_dir)
     if err:
         return err
@@ -123,12 +134,17 @@ def install_new_version() -> str | None:
     err = move_files(files=new_files, origin_dir=new_version_dir, dest_dir="")
     if err:
         return err
+    return None
 
-def create_directories(directories: list, subfolder: str = None) -> str:
-    try:
-        mkdir(subfolder)
-    except:
-        pass
+
+def create_directories(
+    directories: list[str], subfolder: str | None = None
+) -> str | None:
+    if subfolder is not None:
+        try:
+            mkdir(subfolder)
+        except:
+            pass
     for directory in directories:
         if subfolder:
             new_absolute_dir = subfolder + "/" + directory
@@ -140,62 +156,59 @@ def create_directories(directories: list, subfolder: str = None) -> str:
         except:
             return f"Failed to create directory: {new_absolute_dir}"
 
+    return None
 
-def write_update_status(ok: bool, rollback: bool):
+
+def write_update_status(ok: bool, rollback: bool) -> str | None:
     try:
         with open("update.json", "w") as f:
-            dump({
-                "ok": False,
-                "rollback": False,
-            }, f)
+            dump(
+                {
+                    "ok": False,
+                    "rollback": False,
+                },
+                f,
+            )
     except:
         return f"Failed to write update status: ok:{ok}, rollback:{rollback}"
-
-
-def flash_rollback():
-    print("rollback not implemented yet")
+    return None
 
 
 def flash_new_firmware() -> str | None:
     err = validate_new_version()
     if err:
         return err
-    print("new version validated")
-    
+
     err = delete_backup_version()
     if err:
         return err
-    print("old backup deleted")
+
     err = make_new_backup_version()
     if err:
         return err
-    print("new backup created")
-    
+
     err = write_update_status(ok=False, rollback=True)
     if err:
         return err
-    print("changed to rollback state in case of fail")
 
     err = install_new_version()
     if err:
         return err
-    print("installed new version successfully")
 
     rename("remote-version.json", "version.json")
-    print("version.json overwritten")
 
     err = write_update_status(ok=False, rollback=False)
     if err:
         return err
-    print("update status set to false false")
 
     err = _delete_directory_recursively(new_version_dir)
     if err:
         return err
-    print("new version download directory deleted")
-    
 
-def decide_action(status_led) -> None:
+    return None
+
+
+def decide_action(status_led: StatusLed) -> None:
     update_ready = False
     try:
         with open("update.json", "r") as f:
