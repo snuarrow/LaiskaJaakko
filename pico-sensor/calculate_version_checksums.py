@@ -13,11 +13,13 @@ for elem in version_config["files_included"]:
     if not checksum:
         raise Exception(f"ERROR: {filename}, probably missing")
 
-    checksummed_files_included.append({
-        "repository": elem["repository"],
-        "pico": elem["pico"],
-        "check": checksum,
-    })
+    checksummed_files_included.append(
+        {
+            "repository": elem["repository"],
+            "pico": elem["pico"],
+            "check": checksum,
+        }
+    )
 
 version_config["files_included"] = checksummed_files_included
 
