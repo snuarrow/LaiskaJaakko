@@ -172,7 +172,7 @@ def get_updates_availalbe(request: Request) -> Tuple[str, int]:
 @app.route("/api/v1/test", methods=["GET"])  # type: ignore
 def get_test(request: Request):    
     return dumps({
-        "test": "1"
+        "test": "2"
     }), 200
 
 
