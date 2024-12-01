@@ -1,5 +1,5 @@
 {
-    "version": 39,
+    "version": 42,
     "files_included": [
         {
             "repository": "laiska-frontend/dist/assets/index-DpZbFrxV.css.gz",
@@ -24,7 +24,7 @@
         {
             "repository": "components/app.py",
             "pico": "components/app.py",
-            "check": "df1b2cfc7217c02b31b187e1770a1485c42c1d2d31230a5b34d52f45ebaac84c"
+            "check": "c8199e49a168b00ec7a5e9361e736c954e5ef4cd6f9390b4b29becec9cf1b36c"
         },
         {
             "repository": "main.py",
@@ -44,7 +44,7 @@
         {
             "repository": "components/flasher.py",
             "pico": "components/flasher.py",
-            "check": "a8bd9f87189e8a949e65a9939957a63fcf6f28974536f92492a876cf1d7f4c57"
+            "check": "a43991bca736c5741d43627c08c31854bc3704bd725351ba531e7533a28fceeb"
         },
         {
             "repository": "components/wifi_reset_button.py",
@@ -64,7 +64,7 @@
         {
             "repository": "components/cloud_updater.py",
             "pico": "components/cloud_updater.py",
-            "check": "018ea8a5c6f10bc08b5f2ce36308958e6799247533394714592c32a4fd6d66b9"
+            "check": "f728cc337f282bc12defdf71a5f2ccf4c745cc8ef158aa2c03d59384b5a232fe"
         },
         {
             "repository": "components/microdot.py",

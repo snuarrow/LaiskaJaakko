@@ -8,8 +8,8 @@ from time import sleep
 from components.status_led import StatusLed
 
 
-backup_version_dir = "backup_version"
-new_version_dir = "new_version"
+BACKUP_VERSION_DIR = "backup_version"
+NEW_VERSION_DIR = "new_version"
 
 
 def _is_directory(path: str) -> bool:
@@ -38,14 +38,14 @@ def copy_file(src: str, dest: str) -> str | None:
     return None
 
 
-def _delete_directory_recursively(directory: str) -> str | None:
+def delete_directory_recursively(directory: str) -> str | None:
     if not _is_directory(path=directory):
         return None
     try:
         for file_or_dir in listdir(directory):
             full_path = directory + "/" + file_or_dir
             if _is_directory(full_path):
-                _delete_directory_recursively(full_path)
+                delete_directory_recursively(full_path)
             else:
                 remove(full_path)
         rmdir(directory)
@@ -59,7 +59,7 @@ def validate_new_version() -> str | None:
         new_version_config = load(f)
     for file_included in new_version_config["files_included"]:
         calculated_checksum = calculate_checksum(
-            file_path=new_version_dir + "/" + file_included["pico"]
+            file_path=NEW_VERSION_DIR + "/" + file_included["pico"]
         )
         if calculated_checksum != file_included["check"]:
             return f"Error: Checksum mismatch in new file: {file_included['pico']}"
@@ -68,7 +68,7 @@ def validate_new_version() -> str | None:
 
 
 def delete_backup_version() -> str | None:
-    err = _delete_directory_recursively(directory=backup_version_dir)
+    err = delete_directory_recursively(directory=BACKUP_VERSION_DIR)
     if err:
         return err
 
@@ -110,18 +110,18 @@ def make_new_backup_version() -> str | None:
     with open("version.json") as f:
         current_version_config = load(f)
     dirs = current_version_config["directories_included"]
-    err = create_directories(directories=dirs, subfolder=backup_version_dir)
+    err = create_directories(directories=dirs, subfolder=BACKUP_VERSION_DIR)
     if err:
         return err
 
     current_version_files = [
         e["pico"] for e in current_version_config["files_included"]
     ]
-    err = move_files(files=current_version_files, dest_dir=backup_version_dir)
+    err = move_files(files=current_version_files, dest_dir=BACKUP_VERSION_DIR)
     if err:
         return err
 
-    copy_file("version.json", backup_version_dir + "/version.json")
+    copy_file("version.json", BACKUP_VERSION_DIR + "/version.json")
 
     return None
 
@@ -131,7 +131,7 @@ def install_new_version() -> str | None:
         new_version_config = load(f)
 
     new_files = [e["pico"] for e in new_version_config["files_included"]]
-    err = move_files(files=new_files, origin_dir=new_version_dir, dest_dir="")
+    err = move_files(files=new_files, origin_dir=NEW_VERSION_DIR, dest_dir="")
     if err:
         return err
     return None
@@ -201,7 +201,7 @@ def flash_new_firmware() -> str | None:
     if err:
         return err
 
-    err = _delete_directory_recursively(new_version_dir)
+    err = delete_directory_recursively(NEW_VERSION_DIR)
     if err:
         return err
 
