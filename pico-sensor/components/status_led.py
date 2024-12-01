@@ -88,6 +88,24 @@ class StatusLed:
             self.green_pin.value(0)
             sleep(0.2)
 
+    def signal_cloud_update_error(self) -> None:
+        self.disco_stop()
+        self.red_pin = Pin(self.red_pin_number)
+        for _ in range(10):
+            self.red_pin.value(1)
+            sleep(0.1)
+            self.red_pin.value(0)
+            sleep(0.2)
+
+    def signal_cloud_update_ok(self) -> None:
+        self.disco_stop()
+        self.green_pin = Pin(self.green_pin_number)
+        for _ in range(10):
+            self.green_pin.value(1)
+            sleep(0.05)
+            self.green_pin.value(0)
+            sleep(0.2)
+
     def _ap_mode_cycle(self, timer: Timer = None) -> None:
         if self.lit:
             self.red.duty_u16(0)
