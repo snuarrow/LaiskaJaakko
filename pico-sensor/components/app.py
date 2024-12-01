@@ -172,7 +172,7 @@ def get_updates_availalbe(request: Request) -> Tuple[str, int]:
 @app.route("/api/v1/test", methods=["GET"])  # type: ignore
 def get_test(request: Request):    
     return dumps({
-        "yolo": "asd-joko-toimii"
+        "test": "1"
     }), 200
 
 
@@ -180,11 +180,10 @@ def get_test(request: Request):
 def post_reset(request: Request):
     from machine import Timer
     collect()
-    reset()
-    #Timer().init(mode=Timer.ONE_SHOT, period=1000, callback=reset_wrapper)
-    #return dumps({
-    #    "status": "resetting"
-    #}), 200
+    Timer().init(mode=Timer.ONE_SHOT, period=1000, callback=reset_wrapper)
+    return dumps({
+        "status": "resetting"
+    }), 200
 
 
 @app.route("/api/v1/download_firmware", methods=["POST"])  # type: ignore

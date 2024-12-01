@@ -157,10 +157,10 @@ def flash_rollback():
 
 
 def flash_new_firmware() -> str | None:
-    #err = validate_new_version()
-    #if err:
-    #    return err
-    #print("new version validated")
+    err = validate_new_version()
+    if err:
+        return err
+    print("new version validated")
     
     err = delete_backup_version()
     if err:
@@ -193,8 +193,6 @@ def flash_new_firmware() -> str | None:
     if err:
         return err
     print("new version download directory deleted")
-    sleep(10)
-    #reset()
     
 
 def decide_action(status_led) -> None:
@@ -211,15 +209,18 @@ def decide_action(status_led) -> None:
     if rollback:
         print(f"ERROR: rollback not implemented yet")
         pass
-        #flash_rollback()
 
     if update_ready:
         status_led.signal_cloud_update()
         err = flash_new_firmware()
-        status_led.signal_wifi_set()
+        if err:
+            status_led.signal_cloud_update_error()
+        else:
+            status_led.signal_cloud_update_ok()
         reset()
         # reset should have been excecuted at this point if all ok
 
         print(f"Flash new firmware Error: {err}")
+        # TODO: write firmware error to file
 
     collect()

@@ -1,5 +1,5 @@
 {
-    "version": 35,
+    "version": 38,
     "files_included": [
         {
             "repository": "laiska-frontend/dist/assets/index-DpZbFrxV.css.gz",
@@ -24,12 +24,12 @@
         {
             "repository": "components/app.py",
             "pico": "components/app.py",
-            "check": "5e1778231d4f1b12dde1a0a8f10f60426bf18172297ee5cd605754b70817901d"
+            "check": "df1b2cfc7217c02b31b187e1770a1485c42c1d2d31230a5b34d52f45ebaac84c"
         },
         {
             "repository": "main.py",
             "pico": "main.py",
-            "check": "aebce14f3b9d506f3dc5374ec5a508926c36cb5edc7c9be5ab0f97c09bacf578"
+            "check": "02e04310d1ec2b0faec5507b72edf77e01ded75932b929106b656835ea9ef784"
         },
         {
             "repository": "ap_index.html",
@@ -44,7 +44,7 @@
         {
             "repository": "components/flasher.py",
             "pico": "components/flasher.py",
-            "check": "b0de81c76df3105bb58cfb598e1cc9eefe0473b9c0ed0f910b5d97ec719e5b82"
+            "check": "dd4d8a8e0af22da5f2cd961fea9167bcd5ebe0339213e3a80d7240ac461a79a6"
         },
         {
             "repository": "components/wifi_reset_button.py",
@@ -84,7 +84,7 @@
         {
             "repository": "components/status_led.py",
             "pico": "components/status_led.py",
-            "check": "0098c6398a6d98a47d241619a85b9236d7e7843e557b3bfdc2c11174870769b7"
+            "check": "4f776f9de373f7bd021f55c45e8d0fd4bf74aa552d6a63c301d1236781b991a1"
         },
         {
             "repository": "components/web_real_time_clock.py",
