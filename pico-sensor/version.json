@@ -1,5 +1,5 @@
 {
-    "version": 44,
+    "version": 55,
     "files_included": [
         {
             "repository": "laiska-frontend/dist/assets/index-DpZbFrxV.css.gz",
@@ -24,7 +24,7 @@
         {
             "repository": "components/app.py",
             "pico": "components/app.py",
-            "check": "e64cc0d483ee8a3ee38a53abc5569aecb9953956e3852076a23de16f66e5efca"
+            "check": "31c473effbef74d71350c6aa226de2ced0bbaeb470f33ab1ee3486d412baa0bc"
         },
         {
             "repository": "main.py",
@@ -59,12 +59,12 @@
         {
             "repository": "components/helpers.py",
             "pico": "components/helpers.py",
-            "check": "6e6345321084f98a7468c4dac8653d144e521412afe1cdcb8013f265d6e00842"
+            "check": "13b77210aa4e6336593e5c9a29f58b07b81df6f82d56b6ebb90da5b6929a745b"
         },
         {
             "repository": "components/cloud_updater.py",
             "pico": "components/cloud_updater.py",
-            "check": "f728cc337f282bc12defdf71a5f2ccf4c745cc8ef158aa2c03d59384b5a232fe"
+            "check": "5683fcf9fc7ee41434330241f119d21220895bfab38618cf80c33f5139addc52"
         },
         {
             "repository": "components/microdot.py",
@@ -84,7 +84,7 @@
         {
             "repository": "components/status_led.py",
             "pico": "components/status_led.py",
-            "check": "4f776f9de373f7bd021f55c45e8d0fd4bf74aa552d6a63c301d1236781b991a1"
+            "check": "627d42514f7ec3215fa3a522315726aab985d8050c82e2d486de7b08b0bb8502"
         },
         {
             "repository": "components/web_real_time_clock.py",

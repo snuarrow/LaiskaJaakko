@@ -100,7 +100,7 @@ class StatusLed:
     def signal_cloud_update_ok(self) -> None:
         self.disco_stop()
         self.green_pin = Pin(self.green_pin_number)
-        for _ in range(10):
+        for _ in range(3):
             self.green_pin.value(1)
             sleep(0.05)
             self.green_pin.value(0)

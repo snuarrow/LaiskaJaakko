@@ -5,7 +5,7 @@ from machine import Timer, reset  # type: ignore
 from time import sleep
 import socket, ssl
 from json import load, dump
-from components.helpers import print_memory_usage
+from components.helpers import file_exists
 from components.status_led import StatusLed
 from typing import Any, Tuple
 from immutable.checksum import calculate_checksum
@@ -15,6 +15,9 @@ from components.flasher import (
     NEW_VERSION_DIR,
 )
 
+BRANCH: str = "update-button"
+BASE_URL: str = f"https://raw.githubusercontent.com/snuarrow/LaiskaJaakko/{BRANCH}/pico-sensor/"
+
 
 def _load_file(filename: str) -> Any:
     with open(filename, "r") as f:
@@ -22,7 +25,7 @@ def _load_file(filename: str) -> Any:
         return version_config
 
 
-def _download_files(files_missing: list[str], base_url: str) -> None:
+def _download_files(files_missing: list[str]) -> None:
     remote_version_config = _load_file("remote-version.json")
     try:
         delete_directory_recursively("old_version")
@@ -44,7 +47,6 @@ def _download_files(files_missing: list[str], base_url: str) -> None:
                 remote_file_name: str = str(elem["repository"])  # type: ignore
                 relative_local_file_name: str = str(elem["pico"])  # type: ignore
                 _download_file(
-                    base_url=base_url,
                     remote_file_name=remote_file_name,
                     local_file_name=NEW_VERSION_DIR + "/" + relative_local_file_name,
                 )
@@ -57,13 +59,13 @@ def _download_files(files_missing: list[str], base_url: str) -> None:
     collect()
 
 
-def _download_file(base_url: str, remote_file_name: str, local_file_name: str) -> None:
+def _download_file(remote_file_name: str, local_file_name: str) -> None:
     collect()
-    try:
-        remove(local_file_name)
-    except:
-        pass
-    https_file_url = f"{base_url}{remote_file_name}?raw=True"
+    #try:
+    #    remove(local_file_name)
+    #except:
+    #    pass
+    https_file_url = f"{BASE_URL}{remote_file_name}?raw=True"
     _, _, host, path = https_file_url.split("/", 3)
     print(f"<- {https_file_url} as {local_file_name}")
     path = "/" + path
@@ -106,14 +108,6 @@ def _download_file(base_url: str, remote_file_name: str, local_file_name: str) -
     collect()
 
 
-def file_exists(filename: str) -> bool:
-    try:
-        open(filename, "r")
-        return True
-    except OSError:
-        return False
-
-
 def validate_files(remote_config_files: list[str]) -> list[str]:
     invalid_files = []
     folder = f"{NEW_VERSION_DIR}/"
@@ -130,60 +124,36 @@ def validate_files(remote_config_files: list[str]) -> list[str]:
             invalid_files.append(elem)
             continue
 
-    for elem in invalid_files:
-        print(f"missing or corrupted: {elem}")
-
     return invalid_files
 
 
-class CloudUpdater:
+def check_for_updates() -> Tuple[int, int, bool]:
+    print("checking for updates..")
+    version_config = _load_file("version.json")
+    current_version = int(version_config["version"])
+    _download_file("version.json", "remote-version.json")
+    remote_version_config = _load_file("remote-version.json")
+    remote_version: int = remote_version_config["version"]
+    updates_available: bool = remote_version > current_version
+    return current_version, remote_version, updates_available
 
-    branch: str = "update-button"
-    base_url: str = (
-        f"https://raw.githubusercontent.com/snuarrow/LaiskaJaakko/{branch}/pico-sensor/"
-    )
-    current_version: int = 0
-    updates_available: bool = False
 
-    def __init__(self, status_led: StatusLed) -> None:
-        self.status_led = status_led
-        pass
+def download_update() -> None:
+    remote_version_config = _load_file("remote-version.json")
+    files_missing = validate_files(remote_version_config["files_included"])
+    _download_files(files_missing)
 
-    def check_for_updates(self) -> Tuple[int, int, bool]:
-        print("checking for updates..")
-        try:
-            remove("remote-version.json")
-        except:
-            pass
-        self.version_config = _load_file("version.json")
-        self.current_version = int(self.version_config["version"])
-        _download_file(self.base_url, "version.json", "remote-version.json")
-        self.remote_version_config = _load_file("remote-version.json")
-        self.remote_version: int = self.remote_version_config["version"]
-        self.updates_available: bool = self.remote_version > self.current_version
-        print(
-            f"updates available: {self.updates_available}, current_version: {self.current_version}, remote_version: {self.remote_version}"
+
+def get_download_status() -> str | None:
+    err = validate_new_version()
+    if err:
+        return err
+    with open("update.json", "w") as f:
+        dump(
+            {
+                "ok": True,
+                "rollback": False,
+            },
+            f,
         )
-        return self.current_version, self.remote_version, self.updates_available
-
-    def pretty_current_version(self) -> str:
-        return f"v.{self.current_version}"
-
-    def download_update(self, timer: Timer = None) -> None:
-        files_missing = validate_files(self.remote_version_config["files_included"])
-        _download_files(files_missing, self.base_url)
-
-    def get_download_status(self) -> str | None:
-        self.check_for_updates()
-        err = validate_new_version()
-        if err:
-            return err
-        with open("update.json", "w") as f:
-            dump(
-                {
-                    "ok": True,
-                    "rollback": False,
-                },
-                f,
-            )
-        return None
+    return None
