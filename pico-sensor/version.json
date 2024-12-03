@@ -1,5 +1,5 @@
 {
-    "version": 43,
+    "version": 44,
     "files_included": [
         {
             "repository": "laiska-frontend/dist/assets/index-DpZbFrxV.css.gz",
@@ -24,7 +24,7 @@
         {
             "repository": "components/app.py",
             "pico": "components/app.py",
-            "check": "2456fcdbeb42f2d8f80194d2fd6948171c39795f6ddf4c834a89f9089b000168"
+            "check": "e64cc0d483ee8a3ee38a53abc5569aecb9953956e3852076a23de16f66e5efca"
         },
         {
             "repository": "main.py",
@@ -59,7 +59,7 @@
         {
             "repository": "components/helpers.py",
             "pico": "components/helpers.py",
-            "check": "e585009352720ea15ef7af20f4fed1f5e6fda607fade1fcf89ec87a803bf8e4d"
+            "check": "6e6345321084f98a7468c4dac8653d144e521412afe1cdcb8013f265d6e00842"
         },
         {
             "repository": "components/cloud_updater.py",

@@ -1,5 +1,3 @@
-from components.helpers import print_memory_usage
-print_memory_usage()
 from components.flasher import decide_action
 from components.status_led import StatusLed
 status_led = StatusLed()
@@ -10,7 +8,7 @@ from components.network_connection import NetworkConnection
 from components.web_real_time_clock import WebRealTimeClock
 from components.cloud_updater import CloudUpdater
 from components.sensors import Sensors, save_config
-from components.helpers import get_flash_sizes
+from components.helpers import get_flash_sizes, CHUNK_SIZE, CONFIG_FILE
 from components.microdot import Microdot, Response, Request
 from time import sleep
 from json import dumps, load
@@ -18,12 +16,8 @@ from typing import Tuple, Optional, Union
 from gc import collect
 
 
-total_flash, free_flash = get_flash_sizes()
-print(f"Total flash: {total_flash} KB, Free flash: {free_flash} KB")
 frequency_MHz = 100
 freq(frequency_MHz * 1000000)
-CHUNK_SIZE = 1024
-CONFIG_FILE = "config.json"
 pico_led = Pin("LED", Pin.OUT)
 pico_led.value(0)
 status_led.signal_power_on()
@@ -44,10 +38,6 @@ current_version, remote_version, updates_available = cloud_updater.check_for_upd
 sensors = Sensors(rtc=rtc)
 app = Microdot()  # type: ignore
 
-updateRunning = False
-def update_gate() -> Tuple[str, int]:
-    return dumps({"error": "update running"}), 423
-
 
 def reset_wrapper(timer: Timer = None):
     print("reset_wrapper() called")
@@ -56,20 +46,12 @@ def reset_wrapper(timer: Timer = None):
 
 @app.route("/")  # type: ignore
 def index(request: Request) -> Tuple[str, int, dict[str, str]]:
-    collect()
-    global updateRunning
-    if updateRunning:
-        return update_gate()
     with open("/dist/index.html") as f:
         return f.read(), 200, {"Content-Type": "text/html"}
 
 
 @app.route("/api/v1/sensor_meta", methods=["GET"])  # type: ignore
 def get_meta(request: Request) -> Tuple[str, int]:
-    collect()
-    global updateRunning
-    if updateRunning:
-        return update_gate()
     with open(CONFIG_FILE, "r") as f:
         sensor_meta = load(f)["sensors"]
     return dumps(sensor_meta), 200
@@ -77,10 +59,6 @@ def get_meta(request: Request) -> Tuple[str, int]:
 
 @app.route("/api/v1/sensor_data", methods=["GET"])  # type: ignore
 def get_data(request: Request) -> Tuple[str, int]:
-    collect()
-    global updateRunning
-    if updateRunning:
-        return update_gate()
     sensor_index = int(request.args.get("sensor_index", 0))
     sensor_monitor = sensors.get_sensor(index=sensor_index)
     try:
@@ -115,10 +93,6 @@ def get_data(request: Request) -> Tuple[str, int]:
 
 @app.route("/api/v1/sensor_name", methods=["POST"])  # type: ignore
 def set_meta(request: Request) -> Tuple[str, int]:
-    collect()
-    global updateRunning
-    if updateRunning:
-        return update_gate()
     # changes the sensor given name based on query param sensor_index and json payload "given_name": "new_name"
     sensor_index = int(request.args.get("sensor_index", 0))
     data = request.json
@@ -135,19 +109,11 @@ def set_meta(request: Request) -> Tuple[str, int]:
 
 @app.route("/api/v1/led", methods=["GET"])  # type: ignore
 def get_led(request: Request) -> Tuple[str, int]:
-    collect()
-    global updateRunning
-    if updateRunning:
-        return update_gate()
     return dumps({"value": int(status_led.lit)}), 200
 
 
 @app.route("/api/v1/led", methods=["POST"])  # type: ignore
 def set_led(request: Request) -> Tuple[str, int]:
-    collect()
-    global updateRunning
-    if updateRunning:
-        return update_gate()
     data = request.json
     value = data.get("value")
     if value == 0:
@@ -159,8 +125,6 @@ def set_led(request: Request) -> Tuple[str, int]:
 
 @app.route("/api/v1/updates_available", methods=["GET"])  # type: ignore
 def get_updates_availalbe(request: Request) -> Tuple[str, int]:
-    collect()
-    print_memory_usage()
     current_version, remote_version, updates_available = cloud_updater.check_for_updates()
     return dumps({
         "currentVersion": current_version,
@@ -179,7 +143,6 @@ def get_test(request: Request):
 @app.route("/api/v1/reset", methods=["POST"])
 def post_reset(request: Request):
     from machine import Timer
-    collect()
     Timer().init(mode=Timer.ONE_SHOT, period=1000, callback=reset_wrapper)
     return dumps({
         "status": "resetting"
@@ -188,14 +151,11 @@ def post_reset(request: Request):
 
 @app.route("/api/v1/download_firmware", methods=["POST"])  # type: ignore
 def post_update_firmware(request: Request) -> Tuple[str, int]:
-    collect()
     force_update = request.args.get("force", 0)
     _, _, updates_available = cloud_updater.check_for_updates()
     global updateRunning
     if updates_available or force_update:
-        updateRunning = True
         cloud_updater.download_update()
-        updateRunning = False
         err = cloud_updater.get_download_status()
         return_elem = {"ready": True}
         if err:
@@ -207,10 +167,6 @@ def post_update_firmware(request: Request) -> Tuple[str, int]:
 
 @app.route("/<path:path>")  # type: ignore
 def static(request: Request, path: str) -> Optional[Union[Tuple[str, int], Response]]:
-    collect()
-    global updateRunning
-    if updateRunning:
-        return update_gate()
     if "api/v1" in request.url:
         return None
     accept_encoding = request.headers.get("Accept-Encoding", "")
@@ -247,9 +203,7 @@ def serve_file(file_path: str, content_type: str, encoding: str = "") -> Respons
         headers["Content-Encoding"] = encoding
     return Response(body=file_stream(), headers=headers)  # type: ignore
 
-collect()
 print("all set")
-print_memory_usage()
 try:
     app.run(host="0.0.0.0", port=80)  # type: ignore
 except Exception as e:

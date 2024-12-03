@@ -3,6 +3,10 @@ from gc import mem_alloc, mem_free  #  type: ignore
 from typing import Tuple
 
 
+CHUNK_SIZE = 1024
+CONFIG_FILE = "config.json"
+
+
 def get_flash_sizes() -> Tuple[int, int]:
     fs_stat = statvfs('/')
     total_flash = fs_stat[0] * fs_stat[2]
