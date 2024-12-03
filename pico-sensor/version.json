@@ -1,5 +1,5 @@
 {
-    "version": 42,
+    "version": 43,
     "files_included": [
         {
             "repository": "laiska-frontend/dist/assets/index-DpZbFrxV.css.gz",
@@ -24,7 +24,7 @@
         {
             "repository": "components/app.py",
             "pico": "components/app.py",
-            "check": "c8199e49a168b00ec7a5e9361e736c954e5ef4cd6f9390b4b29becec9cf1b36c"
+            "check": "2456fcdbeb42f2d8f80194d2fd6948171c39795f6ddf4c834a89f9089b000168"
         },
         {
             "repository": "main.py",

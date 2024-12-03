@@ -4,7 +4,7 @@ from components.flasher import decide_action
 from components.status_led import StatusLed
 status_led = StatusLed()
 decide_action(status_led=status_led)
-from machine import Pin, reset, #freq  # type: ignore
+from machine import Pin, reset, freq  # type: ignore
 from components.wifi_reset_button import WifiResetButton
 from components.network_connection import NetworkConnection
 from components.web_real_time_clock import WebRealTimeClock
@@ -20,8 +20,8 @@ from gc import collect
 
 total_flash, free_flash = get_flash_sizes()
 print(f"Total flash: {total_flash} KB, Free flash: {free_flash} KB")
-#frequency_MHz = 125
-#freq(frequency_MHz * 1000000)
+frequency_MHz = 100
+freq(frequency_MHz * 1000000)
 CHUNK_SIZE = 1024
 CONFIG_FILE = "config.json"
 pico_led = Pin("LED", Pin.OUT)
