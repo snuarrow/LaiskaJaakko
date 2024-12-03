@@ -20,3 +20,11 @@ def print_memory_usage() -> None:
     total_memory = mem_alloc() + mem_free()
     used_memory = mem_alloc()
     print(f"Memory usage: {used_memory / 1000} / {total_memory / 1000}")
+
+
+def file_exists(filename: str) -> bool:
+    try:
+        open(filename, "r")
+        return True
+    except OSError:
+        return False

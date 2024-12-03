@@ -1,12 +1,13 @@
 from components.flasher import decide_action
 from components.status_led import StatusLed
+
 status_led = StatusLed()
 decide_action(status_led=status_led)
 from machine import Pin, reset, freq  # type: ignore
 from components.wifi_reset_button import WifiResetButton
 from components.network_connection import NetworkConnection
 from components.web_real_time_clock import WebRealTimeClock
-from components.cloud_updater import CloudUpdater
+from components.cloud_updater import check_for_updates, download_update, get_download_status
 from components.sensors import Sensors, save_config
 from components.helpers import get_flash_sizes, CHUNK_SIZE, CONFIG_FILE
 from components.microdot import Microdot, Response, Request
@@ -26,6 +27,7 @@ network_connection = NetworkConnection()
 while True:
     if network_connection.ap_active():
         from components.ap_web_server import start_ap_web_server
+
         status_led.ap_mode_start()
         start_ap_web_server(status_led=status_led)
     if network_connection.wlan_active():
@@ -33,14 +35,12 @@ while True:
         break
     sleep(5)
 rtc = WebRealTimeClock()
-cloud_updater = CloudUpdater(status_led=status_led)
-current_version, remote_version, updates_available = cloud_updater.check_for_updates()
+current_version, remote_version, updates_available = check_for_updates()
 sensors = Sensors(rtc=rtc)
 app = Microdot()  # type: ignore
 
 
 def reset_wrapper(timer: Timer = None):
-    print("reset_wrapper() called")
     reset()
 
 
@@ -106,7 +106,6 @@ def set_meta(request: Request) -> Tuple[str, int]:
     return dumps({"name": given_name}), 200
 
 
-
 @app.route("/api/v1/led", methods=["GET"])  # type: ignore
 def get_led(request: Request) -> Tuple[str, int]:
     return dumps({"value": int(status_led.lit)}), 200
@@ -125,38 +124,35 @@ def set_led(request: Request) -> Tuple[str, int]:
 
 @app.route("/api/v1/updates_available", methods=["GET"])  # type: ignore
 def get_updates_availalbe(request: Request) -> Tuple[str, int]:
-    current_version, remote_version, updates_available = cloud_updater.check_for_updates()
-    return dumps({
-        "currentVersion": current_version,
-        "remoteVersion": remote_version,
-        "updatesAvailable": updates_available,
-    }), 200
-
-
-@app.route("/api/v1/test", methods=["GET"])  # type: ignore
-def get_test(request: Request):    
-    return dumps({
-        "test": "2"
-    }), 200
+    current_version, remote_version, updates_available = check_for_updates()
+    return (
+        dumps(
+            {
+                "currentVersion": current_version,
+                "remoteVersion": remote_version,
+                "updatesAvailable": updates_available,
+            }
+        ),
+        200,
+    )
 
 
 @app.route("/api/v1/reset", methods=["POST"])
 def post_reset(request: Request):
     from machine import Timer
+
     Timer().init(mode=Timer.ONE_SHOT, period=1000, callback=reset_wrapper)
-    return dumps({
-        "status": "resetting"
-    }), 200
+    return dumps({"status": "resetting"}), 200
 
 
 @app.route("/api/v1/download_firmware", methods=["POST"])  # type: ignore
 def post_update_firmware(request: Request) -> Tuple[str, int]:
     force_update = request.args.get("force", 0)
-    _, _, updates_available = cloud_updater.check_for_updates()
+    _, _, updates_available = check_for_updates()
     global updateRunning
     if updates_available or force_update:
-        cloud_updater.download_update()
-        err = cloud_updater.get_download_status()
+        download_update()
+        err = get_download_status()
         return_elem = {"ready": True}
         if err:
             return_elem["error"] = err
@@ -181,7 +177,7 @@ def static(request: Request, path: str) -> Optional[Union[Tuple[str, int], Respo
     elif path.endswith(".html"):
         return serve_file(path, "text/html")
     elif path.endswith(".ico"):
-        return serve_file(path, 'image/x-icon')
+        return serve_file(path, "image/x-icon")
     return serve_file(path, "application/octet-stream")
 
 
@@ -202,6 +198,7 @@ def serve_file(file_path: str, content_type: str, encoding: str = "") -> Respons
     if encoding:
         headers["Content-Encoding"] = encoding
     return Response(body=file_stream(), headers=headers)  # type: ignore
+
 
 print("all set")
 try:
