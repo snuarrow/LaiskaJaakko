@@ -5,7 +5,7 @@ from machine import Timer, reset  # type: ignore
 from time import sleep
 import socket, ssl
 from json import load, dump
-from components.helpers import file_exists
+from components.helpers import file_exists, load_json
 from components.status_led import StatusLed
 from typing import Any, Tuple
 from immutable.checksum import calculate_checksum
@@ -17,6 +17,7 @@ from components.flasher import (
 
 BRANCH: str = "update-button"
 BASE_URL: str = f"https://raw.githubusercontent.com/snuarrow/LaiskaJaakko/{BRANCH}/pico-sensor/"
+VERSION_JSON: str = "version.json"
 
 
 def _load_file(filename: str) -> Any:
@@ -61,15 +62,12 @@ def _download_files(files_missing: list[str]) -> None:
 
 def _download_file(remote_file_name: str, local_file_name: str) -> None:
     collect()
-    #try:
-    #    remove(local_file_name)
-    #except:
-    #    pass
     https_file_url = f"{BASE_URL}{remote_file_name}?raw=True"
     _, _, host, path = https_file_url.split("/", 3)
     print(f"<- {https_file_url} as {local_file_name}")
     path = "/" + path
     addr = socket.getaddrinfo(host, 443)[0][-1]
+    collect()
     http_socket = socket.socket()
     http_socket.connect(addr)
     collect()
@@ -127,21 +125,29 @@ def validate_files(remote_config_files: list[str]) -> list[str]:
     return invalid_files
 
 
-def check_for_updates() -> Tuple[int, int, bool]:
+def check_for_updates() -> Tuple[int, int, bool, str | None]:
     print("checking for updates..")
-    version_config = _load_file("version.json")
+    version_config, err = load_json(filename=VERSION_JSON)
+    if err:
+        return 0, 0, False, err
     current_version = int(version_config["version"])
-    _download_file("version.json", "remote-version.json")
+    try:
+        _download_file("version.json", "remote-version.json")
+    except Exception as e:
+        return 0, 0, False, f"Failed to download version.json: {str(e)}"
     remote_version_config = _load_file("remote-version.json")
     remote_version: int = remote_version_config["version"]
     updates_available: bool = remote_version > current_version
-    return current_version, remote_version, updates_available
+    return current_version, remote_version, updates_available, None
 
 
-def download_update() -> None:
+def download_update() -> None | str:
     remote_version_config = _load_file("remote-version.json")
     files_missing = validate_files(remote_version_config["files_included"])
-    _download_files(files_missing)
+    try:
+        _download_files(files_missing)
+    except Exception as e:
+        return f"Failed to update: {str(e)}"
 
 
 def get_download_status() -> str | None:

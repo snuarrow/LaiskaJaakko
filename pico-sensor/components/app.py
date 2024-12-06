@@ -9,7 +9,7 @@ from components.network_connection import NetworkConnection
 from components.web_real_time_clock import WebRealTimeClock
 from components.cloud_updater import check_for_updates, download_update, get_download_status
 from components.sensors import Sensors, save_config
-from components.helpers import get_flash_sizes, CHUNK_SIZE, CONFIG_FILE
+from components.helpers import get_flash_sizes, CHUNK_SIZE, CONFIG_FILE, reset_wrapper
 from components.microdot import Microdot, Response, Request
 from time import sleep
 from json import dumps, load
@@ -35,13 +35,14 @@ while True:
         break
     sleep(5)
 rtc = WebRealTimeClock()
-current_version, remote_version, updates_available = check_for_updates()
 sensors = Sensors(rtc=rtc)
 app = Microdot()  # type: ignore
 
 
-def reset_wrapper(timer: Timer = None):
-    reset()
+def internal_error(err: str) -> Tuple[str, int]:
+    return dumps({
+        "error": err
+    }), 500
 
 
 @app.route("/")  # type: ignore
@@ -124,7 +125,9 @@ def set_led(request: Request) -> Tuple[str, int]:
 
 @app.route("/api/v1/updates_available", methods=["GET"])  # type: ignore
 def get_updates_availalbe(request: Request) -> Tuple[str, int]:
-    current_version, remote_version, updates_available = check_for_updates()
+    current_version, remote_version, updates_available, err = check_for_updates()
+    if err:
+        return internal_error(err=err)
     return (
         dumps(
             {
@@ -148,16 +151,19 @@ def post_reset(request: Request):
 @app.route("/api/v1/download_firmware", methods=["POST"])  # type: ignore
 def post_update_firmware(request: Request) -> Tuple[str, int]:
     force_update = request.args.get("force", 0)
-    _, _, updates_available = check_for_updates()
-    global updateRunning
+    _, _, updates_available, err = check_for_updates()
+    if err:
+        return dumps({"error": err}), 500
     if updates_available or force_update:
-        download_update()
-        err = get_download_status()
-        return_elem = {"ready": True}
+        err = download_update()
         if err:
-            return_elem["error"] = err
-            return_elem["ready"] = False
-        return dumps(return_elem), 200
+            return internal_error(err=err)
+        err = get_download_status()
+        if err:
+            return internal_error(err=err)
+        return dumps({
+            "ready": True
+        }), 200
     return dumps({"error": "no updates available"}), 400
 
 
