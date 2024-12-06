@@ -1,5 +1,5 @@
 {
-    "version": 55,
+    "version": 60,
     "files_included": [
         {
             "repository": "laiska-frontend/dist/assets/index-DpZbFrxV.css.gz",
@@ -24,7 +24,7 @@
         {
             "repository": "components/app.py",
             "pico": "components/app.py",
-            "check": "31c473effbef74d71350c6aa226de2ced0bbaeb470f33ab1ee3486d412baa0bc"
+            "check": "ad398658c09dd08d01737b2ec871c664c823b968d4e83012cbc724e7be71cca8"
         },
         {
             "repository": "main.py",
@@ -59,12 +59,12 @@
         {
             "repository": "components/helpers.py",
             "pico": "components/helpers.py",
-            "check": "13b77210aa4e6336593e5c9a29f58b07b81df6f82d56b6ebb90da5b6929a745b"
+            "check": "337521ce7190ba9a77a956a659965218e53aea0561f915eaee2331c0406b51d5"
         },
         {
             "repository": "components/cloud_updater.py",
             "pico": "components/cloud_updater.py",
-            "check": "5683fcf9fc7ee41434330241f119d21220895bfab38618cf80c33f5139addc52"
+            "check": "1b801b14caef0623e40b9f22cec550c98f7e98ab697ca1e194cb31b6bed14348"
         },
         {
             "repository": "components/microdot.py",
