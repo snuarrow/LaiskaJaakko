@@ -15,7 +15,7 @@ from components.flasher import (
     NEW_VERSION_DIR,
 )
 
-BRANCH: str = "update-button"
+BRANCH: str = "main"
 BASE_URL: str = f"https://raw.githubusercontent.com/snuarrow/LaiskaJaakko/{BRANCH}/pico-sensor/"
 VERSION_JSON: str = "version.json"
 
@@ -27,7 +27,9 @@ def _load_file(filename: str) -> Any:
 
 
 def _download_files(files_missing: list[str]) -> None:
-    remote_version_config = _load_file("remote-version.json")
+    remote_version_config, err = load_json("remote-version.json")
+    if err:
+        raise Exception("Failed to load remote-version.json")
     try:
         delete_directory_recursively("old_version")
     except:
@@ -135,14 +137,18 @@ def check_for_updates() -> Tuple[int, int, bool, str | None]:
         _download_file("version.json", "remote-version.json")
     except Exception as e:
         return 0, 0, False, f"Failed to download version.json: {str(e)}"
-    remote_version_config = _load_file("remote-version.json")
+    remote_version_config, err = load_json(filename="remote-version.json")
+    if err:
+        return 0, 0, False, err
     remote_version: int = remote_version_config["version"]
     updates_available: bool = remote_version > current_version
     return current_version, remote_version, updates_available, None
 
 
 def download_update() -> None | str:
-    remote_version_config = _load_file("remote-version.json")
+    remote_version_config, err = load_json(filename="remote-version.json")
+    if err:
+        return f"Failed to load remote-version.json"
     files_missing = validate_files(remote_version_config["files_included"])
     try:
         _download_files(files_missing)

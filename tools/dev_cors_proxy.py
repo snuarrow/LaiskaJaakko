@@ -18,6 +18,11 @@ cors = CORS(
 sensor_url = getenv("SENSOR_URL")
 
 
+@app.route("/api/v1/health", methods=["GET"])
+def proxy_get_health():
+    return get(f"{sensor_url}/api/v1/health").json()
+
+
 @app.route("/api/v1/sensor_meta", methods=["GET"])
 def proxy_sensor_meta():
     return get(f"{sensor_url}/api/v1/sensor_meta").json()

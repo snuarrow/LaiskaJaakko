@@ -1,15 +1,15 @@
 {
-    "version": 60,
+    "version": 67,
     "files_included": [
         {
-            "repository": "laiska-frontend/dist/assets/index-DpZbFrxV.css.gz",
-            "pico": "dist/assets/index-DpZbFrxV.css.gz",
-            "check": "64749045f094a23d2741ff118712bccb9594984d9bcfe6adeaef5b58a97afd09"
+            "repository": "laiska-frontend/dist/assets/index-Pfmmybet.css.gz",
+            "pico": "dist/assets/index-Pfmmybet.css.gz",
+            "check": "a134dd530ad48a117cc78d3971db7e67180179771f9007eb3d12ebad1ce0a052"
         },
         {
-            "repository": "laiska-frontend/dist/assets/index-j1FVgEmo.js.gz",
-            "pico": "dist/assets/index-j1FVgEmo.js.gz",
-            "check": "20989b4ce62d3866662fdc7ad3dffd0c579ae1eb9235a5e4edbe64961eb949b1"
+            "repository": "laiska-frontend/dist/assets/index-D_uGxLad.js.gz",
+            "pico": "dist/assets/index-D_uGxLad.js.gz",
+            "check": "e04474071a6a8cda5d279a23cdbe49eef4cdd6a17286508d611b08d579120650"
         },
         {
             "repository": "laiska-frontend/dist/favicon.ico",
@@ -19,12 +19,12 @@
         {
             "repository": "laiska-frontend/dist/index.html",
             "pico": "dist/index.html",
-            "check": "036f8bcb9a0ce46b5114595161953df8fdf8949f8b54c7ec6541b8643815e90d"
+            "check": "a628d200a2d5a3a390e2f3a4576dae64feb575950471322b43ef088704f4d2e8"
         },
         {
             "repository": "components/app.py",
             "pico": "components/app.py",
-            "check": "ad398658c09dd08d01737b2ec871c664c823b968d4e83012cbc724e7be71cca8"
+            "check": "792efcdfbd87eacd1ff2d67c3c2f6a48a4d53ac66f4ead416fed686dd9042acc"
         },
         {
             "repository": "main.py",
@@ -44,7 +44,7 @@
         {
             "repository": "components/flasher.py",
             "pico": "components/flasher.py",
-            "check": "a43991bca736c5741d43627c08c31854bc3704bd725351ba531e7533a28fceeb"
+            "check": "470e7c5c75e27772fc756947f2f670c6b2729a003e47a4f89e527c5eca866717"
         },
         {
             "repository": "components/wifi_reset_button.py",
@@ -59,12 +59,12 @@
         {
             "repository": "components/helpers.py",
             "pico": "components/helpers.py",
-            "check": "337521ce7190ba9a77a956a659965218e53aea0561f915eaee2331c0406b51d5"
+            "check": "aa24d0b204004a4405c285e4a9603594831e0c286e048fea5e01dde2b78de68a"
         },
         {
             "repository": "components/cloud_updater.py",
             "pico": "components/cloud_updater.py",
-            "check": "1b801b14caef0623e40b9f22cec550c98f7e98ab697ca1e194cb31b6bed14348"
+            "check": "91ef6a8d65833fab066c56f27eb33eee577ef23548958646cb4dc0e2f5670378"
         },
         {
             "repository": "components/microdot.py",

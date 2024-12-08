@@ -13,6 +13,10 @@ export default function UpdateComponent() {
   const [downloading, setDownloading] = useState<boolean>(false);
   const [installing, setInstalling] = useState<boolean>(false);
 
+  const handleReload = () => {
+    window.location.reload();
+  };
+
   const handleDownload = async() => {
     try {
       setDownloading(true);
@@ -30,9 +34,29 @@ export default function UpdateComponent() {
 
   const handleInstall = async() => {
     try {
+      setInstalling(true)
       console.log("initiating install new firmware procedure")
       const response = await axios.post(API_URL + "/api/v1/reset");
-      setInstalling(true)
+      console.log(response)
+      const url = API_URL + "/api/v1/health"
+      const timeout = 1000;
+      const maxRetries = 30;
+      const handleReady = async() => {
+        for (let i = 0; i < maxRetries; i++) {
+          try {
+            const response = await axios.get(url, { timeout });
+            if (response.status === 200 && response.data?.ok === true) {
+              handleReload()
+              break
+            }
+          } catch (error) {
+
+          }
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+        }
+        console.error("update install error")
+      }
+      setTimeout(handleReady, 2000)
     } catch (error) {
       console.error("error while initiating install procedure")
     }
@@ -74,8 +98,8 @@ export default function UpdateComponent() {
         <div>Available version: {String(remoteVersion)}</div>
         {updatesAvailable && !downloading && !downloadOk && (<button onClick={handleDownload}>Download</button>)}
         {downloadOk && !installing && (<button onClick={handleInstall}>Install</button>)}
-        {downloading && (<ProgressBar duration={90} description="downloading.."/>)}
-        {installing && (<ProgressBar duration={90} description="installing.."/>)}
+        {downloading && (<ProgressBar duration={60} description="downloading.."/>)}
+        {installing && (<ProgressBar duration={60} description="installing.."/>)}
     </div>
   );
 };

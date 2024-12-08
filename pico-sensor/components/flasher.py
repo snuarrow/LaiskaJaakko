@@ -23,13 +23,10 @@ def _is_directory(path: str) -> bool:
 
 def copy_file(src: str, dest: str) -> str | None:
     try:
-        # Open the source file in read mode
         with open(src, "rb") as source_file:
-            # Open the destination file in write mode
             with open(dest, "wb") as dest_file:
-                # Read and write in chunks to avoid memory issues
                 while True:
-                    chunk = source_file.read(1024)  # Adjust chunk size if necessary
+                    chunk = source_file.read(1024)
                     if not chunk:
                         break
                     dest_file.write(chunk)
