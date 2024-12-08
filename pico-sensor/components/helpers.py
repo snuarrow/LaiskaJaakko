@@ -41,8 +41,3 @@ def load_json(filename: str) -> Tuple[Any, str | None]:
             return version_config, None
     except Exception as e:
         return None, f"error reading json file: {filename}, exception: {str(e)}"
-
-
-def reset_wrapper(timer: Timer = None):
-    # Wrapper is needed when reset is triggered with Timer
-    reset()

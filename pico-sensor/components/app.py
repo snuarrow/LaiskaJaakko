@@ -9,7 +9,7 @@ from components.network_connection import NetworkConnection
 from components.web_real_time_clock import WebRealTimeClock
 from components.cloud_updater import check_for_updates, download_update, get_download_status
 from components.sensors import Sensors, save_config
-from components.helpers import get_flash_sizes, CHUNK_SIZE, CONFIG_FILE, reset_wrapper
+from components.helpers import get_flash_sizes, CHUNK_SIZE, CONFIG_FILE
 from components.microdot import Microdot, Response, Request
 from time import sleep
 from json import dumps, load
@@ -49,6 +49,14 @@ def internal_error(err: str) -> Tuple[str, int]:
 def index(request: Request) -> Tuple[str, int, dict[str, str]]:
     with open("/dist/index.html") as f:
         return f.read(), 200, {"Content-Type": "text/html"}
+
+
+@app.route("/api/v1/health", methods=["GET"])
+def get_health(request: Request) -> Tuple[str, int]:
+    return dumps({
+        "ok": True
+        # TODO: return also ram and disk usage
+    }), 200
 
 
 @app.route("/api/v1/sensor_meta", methods=["GET"])  # type: ignore
@@ -143,6 +151,9 @@ def get_updates_availalbe(request: Request) -> Tuple[str, int]:
 @app.route("/api/v1/reset", methods=["POST"])
 def post_reset(request: Request):
     from machine import Timer
+    def reset_wrapper(timer: Timer = None):
+        # Wrapper is needed when reset is triggered with Timer
+        reset()
 
     Timer().init(mode=Timer.ONE_SHOT, period=1000, callback=reset_wrapper)
     return dumps({"status": "resetting"}), 200
